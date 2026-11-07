@@ -345,3 +345,7 @@ dialog ul { padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; max-he
 .hint-box p { margin: 0; flex: 1 1 320px; max-width: 80ch; }
 .hint-box .muted { color: inherit; opacity: .8; }
 .dot.reader { background: var(--consider); }
+
+.undo-state { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+.undo-state.backup, .undo-state.reinstall { color: var(--consider); }
+.undo-state.none { color: var(--remove); }

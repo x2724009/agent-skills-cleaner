@@ -269,6 +269,9 @@ def analyze(scan_result, known=None, agent_tiers=None):
     for skill in scan_result["skills"]:
         item = {k: v for k, v in skill.items() if k != "body"}
         item.update(analyze_skill(skill, known))
+        rule = _match_known(skill, known)
+        if rule and rule.get("source"):
+            item["source_hint"] = rule["source"]
         seen = {i["agent"]: (agent_tiers.get(i["agent"]) or "frontier") for i in item["installs"]}
         item["agent_tiers"] = seen
         weakest = max((TIERS.index(t) for t in seen.values()), default=0)

@@ -11,9 +11,12 @@ detail to undo it, and nothing is ever removed permanently.
 import json
 import os
 import shutil
+import tarfile
 import sys
 import time
 import uuid
+
+from . import recovery
 
 STATE_DIR = os.path.expanduser("~/.agent-skills-cleaner")
 HISTORY_PATH = os.path.join(STATE_DIR, "history.json")
@@ -118,8 +121,13 @@ def _delete_steps(skill):
     while os.path.lexists(dest):
         n += 1
         dest = os.path.join(trash_dir(), "%s (agent-skills-cleaner %s-%d)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S"), n))
+    try:
+        backup = recovery.make_backup(real, STATE_DIR)
+    except (OSError, tarfile.TarError):
+        backup = None
+    source = recovery.describe_source(skill)
     shutil.move(real, dest)
-    steps.append({"op": "move", "src": real, "dst": dest})
+    steps.append({"op": "move", "src": real, "dst": dest, "backup": backup, "source": source})
     return steps
 
 
@@ -215,18 +223,36 @@ def _explain(err):
 
 
 def _check_restorable(steps):
-    """Fail before touching anything if any step cannot be undone."""
+    """Pick how to undo every step, and fail before touching anything if one cannot be undone."""
+    methods = []
     for step in steps:
         if step["op"] != "move":
+            methods.append(None)
             continue
         if os.path.lexists(step["src"]):
             raise ActionError("something already exists at %s" % step["src"])
-        try:
-            os.lstat(step["dst"])  # the exact item only: macOS may block listing the Trash but allow this
-        except FileNotFoundError:
-            raise ActionError("no longer at %s" % step["dst"])
-        except OSError as e:
-            raise ActionError(_explain(e))
+        method = recovery.method_for(step)
+        if method is None:
+            raise ActionError("%s can no longer be brought back: it is gone from the Trash and there is no "
+                              "backup or known source to reinstall it from" % os.path.basename(step["src"]))
+        methods.append(method)
+    return methods
+
+
+def undo_methods(entry):
+    """For the History panel: how each deleted folder would come back, or None."""
+    return [recovery.method_for(st) for st in entry["steps"] if st["op"] == "move"]
+
+
+def history_view():
+    out = []
+    for e in load_history():
+        e = dict(e)
+        if not e.get("restored"):
+            methods = undo_methods(e)
+            e["undo"] = "none" if None in methods else sorted(set(methods)) or ["links"]
+        out.append(e)
+    return out
 
 
 def restore(entry_id):
@@ -237,26 +263,29 @@ def restore(entry_id):
     if entry["restored"]:
         raise ActionError("already restored")
     steps = list(reversed(entry["steps"]))  # put folders back before relinking to them
-    _check_restorable(steps)
+    methods = _check_restorable(steps)
     done = []
     try:
-        for step in steps:
+        for step, method in zip(steps, methods):
             if step["op"] == "move":
-                shutil.move(step["dst"], step["src"])
-                done.append(step)
+                recovery.undo_move(step, method)
+                done.append((step, method))
             elif step["op"] == "unlink" and not os.path.lexists(step["path"]):
                 os.symlink(step["target"], step["path"])
-                done.append(step)
-    except OSError as e:
-        for step in reversed(done):  # leave things exactly as they were
+                done.append((step, None))
+    except (OSError, recovery.RecoveryError) as e:
+        for step, method in reversed(done):  # leave things exactly as they were
             try:
-                if step["op"] == "move":
+                if step["op"] == "unlink":
+                    os.unlink(step["path"])
+                elif method == "trash":
                     shutil.move(step["src"], step["dst"])
                 else:
-                    os.unlink(step["path"])
+                    shutil.rmtree(step["src"])  # we created it from a backup or a download
             except OSError:
                 pass
-        raise ActionError(_explain(e))
+        raise ActionError(_explain(e) if isinstance(e, OSError) else str(e))
+    entry["restored_via"] = sorted({m for m in methods if m})
     entry["restored"] = True
     entry["restored_at"] = time.time()
     _save_history(history)

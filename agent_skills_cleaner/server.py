@@ -104,7 +104,7 @@ def make_handler(state, port):
             if path == "/api/scan":
                 return self._send(200, state.rescan())
             if path == "/api/history":
-                return self._send(200, actions.load_history())
+                return self._send(200, actions.history_view())
             if path == "/api/config":
                 return self._send(200, config.load_config())
             self._send(404, {"error": "not found"})
@@ -174,6 +174,10 @@ def make_handler(state, port):
 
 
 def serve(port=7457, open_browser=True, readonly=False, roots=None):
+    from . import recovery
+    pruned = recovery.prune_backups(actions.STATE_DIR)
+    if pruned:
+        print("removed %d backups older than %d days" % (pruned, recovery.BACKUP_DAYS), flush=True)
     state = State(readonly, roots)
     state.rescan()
     httpd = None

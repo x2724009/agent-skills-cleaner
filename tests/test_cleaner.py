@@ -1,9 +1,12 @@
 import os
 import shutil
+import subprocess
+import tarfile
 import tempfile
+import time
 import unittest
 
-from agent_skills_cleaner import actions, config, models
+from agent_skills_cleaner import actions, config, models, recovery
 from agent_skills_cleaner.analyzer import analyze
 from agent_skills_cleaner.scanner import parse_frontmatter, scan
 
@@ -129,14 +132,35 @@ class SkillTest(unittest.TestCase):
         self.assertTrue(os.path.islink(os.path.join(self.agent, "be-careful")))
         self.assertFalse(os.path.exists(os.path.join(home, "be-careful")))
 
-    def test_restore_checks_everything_before_acting(self):
+    def test_restore_from_backup_after_trash_is_emptied(self):
         s = self.by_name("be-careful")
         entry = actions.delete(s)
-        trashed = [st["dst"] for st in entry["steps"] if st["op"] == "move"][0]
-        shutil.rmtree(trashed)  # e.g. the Trash was emptied
+        move = [st for st in entry["steps"] if st["op"] == "move"][0]
+        self.assertTrue(os.path.isfile(move["backup"]))
+        shutil.rmtree(move["dst"])  # the Trash was emptied
+        self.assertEqual(actions.history_view()[0]["undo"], ["backup"])
+        actions.restore(entry["id"])
+        self.assertTrue(os.path.isfile(os.path.join(self.prompt, "SKILL.md")))
+        self.assertTrue(os.path.islink(os.path.join(self.agent, "be-careful")))
+
+    def test_restore_refuses_when_nothing_is_left(self):
+        s = self.by_name("be-careful")
+        entry = actions.delete(s)
+        move = [st for st in entry["steps"] if st["op"] == "move"][0]
+        shutil.rmtree(move["dst"])
+        os.remove(move["backup"])
+        self.assertEqual(actions.history_view()[0]["undo"], "none")
         with self.assertRaises(actions.ActionError):
             actions.restore(entry["id"])
         self.assertFalse(os.path.lexists(os.path.join(self.agent, "be-careful")))  # no half-restore
+
+    def test_old_backups_are_pruned(self):
+        entry = actions.delete(self.by_name("be-careful"))
+        backup = [st for st in entry["steps"] if st["op"] == "move"][0]["backup"]
+        old = time.time() - (recovery.BACKUP_DAYS + 1) * 86400
+        os.utime(backup, (old, old))
+        self.assertEqual(recovery.prune_backups(actions.STATE_DIR), 1)
+        self.assertFalse(os.path.exists(backup))
 
     def test_uninstall_refuses_real_folder(self):
         s = self.by_name("be-careful")
@@ -207,6 +231,50 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(p["Claude Code"]["effective"], "frontier")
         p = models.effective_profile(detected, {"Claude Code": {"model": "qwen2.5-7b", "tier": ""}}, ["Claude Code"])
         self.assertEqual((p["Claude Code"]["tier"], p["Claude Code"]["source"]), ("small", "manual"))
+
+
+class ReinstallTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = os.path.realpath(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_reinstall_from_archive(self):
+        src = os.path.join(self.tmp, "pkg", "lark-doc")
+        os.makedirs(src)
+        with open(os.path.join(src, "SKILL.md"), "w") as f:
+            f.write("---\nname: lark-doc\n---\nhi\n")
+        archive = os.path.join(self.tmp, "lark-doc.tar.gz")
+        with tarfile.open(archive, "w:gz") as tar:
+            tar.add(src, arcname="lark-doc")
+        saved = recovery._download
+        recovery._download = lambda url, dest: shutil.copy(archive, dest)
+        try:
+            target = os.path.join(self.tmp, "skills", "lark-doc")
+            source = {"kind": "archive", "url": "https://example.com/lark-doc.tar.gz", "name": "lark-doc", "folder": "lark-doc"}
+            self.assertTrue(recovery.can_reinstall(source))
+            recovery.reinstall(source, target)
+            self.assertTrue(os.path.isfile(os.path.join(target, "SKILL.md")))
+        finally:
+            recovery._download = saved
+
+    @unittest.skipUnless(shutil.which("git"), "git not installed")
+    def test_reinstall_from_local_git_repo(self):
+        repo = os.path.join(self.tmp, "repo")
+        skill = os.path.join(repo, "skills", "novel-a")
+        os.makedirs(skill)
+        with open(os.path.join(skill, "SKILL.md"), "w") as f:
+            f.write("---\nname: novel-a\n---\n")
+        run = lambda *a: subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=repo, check=True, capture_output=True)
+        run("init", "-q")
+        run("add", ".")
+        run("commit", "-qm", "init")
+        source = recovery.describe_source({"real_path": skill, "name": "novel-a", "managed": None}, home=self.tmp)
+        self.assertEqual(source["kind"], "git-repo")
+        shutil.rmtree(skill)
+        recovery.reinstall(source, skill)
+        self.assertTrue(os.path.isfile(os.path.join(skill, "SKILL.md")))
 
 
 class PackageTest(unittest.TestCase):

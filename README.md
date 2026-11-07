@@ -32,7 +32,12 @@ Agent Skills Cleaner 会：
 - **两种清理**：
   - **卸载**：只移除某个工具里的链接，原文件和其他工具不受影响。
   - **删除**：把 skill 文件夹移到废纸篓，并移除所有指向它的链接。
-- **全部可撤销**：每次操作都记在 `~/.agent-skills-cleaner/history.json`，在网页"操作记录"里一键恢复。
+- **全部可撤销，清空废纸篓也能找回**：每次操作都记在 `~/.agent-skills-cleaner/history.json`。撤销时依次尝试：
+  1. 从废纸篓放回；
+  2. 从删除前自动做的备份恢复（`~/.agent-skills-cleaner/backups`，保留 30 天，单个超过 200 MB 不备份）；
+  3. 从原来的安装地址重新下载：安装器 lock 文件里记录的压缩包或 git 仓库，或者本机 git 仓库里的 `git checkout`。
+
+  操作记录会标明每条能用哪种方式恢复；三种都不行时会写明"已无法撤销"。
 - **失效链接**：找出指向已不存在文件夹的链接。
 - **中英双语**界面，跟随系统深浅色。
 - **零依赖**：只用 Python 标准库（3.9+），不需要 `pip install` 任何东西。
@@ -97,7 +102,8 @@ python3 -m agent_skills_cleaner --root "MyAgent=~/my/skills" serve   # 扫描指
 - 只监听 `127.0.0.1`，并校验 Host 头，防止 DNS rebinding。
 - 每次启动生成随机 token，其他网站无法调用接口。
 - 只能操作本次扫描到的 skill，不接受任意路径。
-- 永远不做永久删除：文件进废纸篓，操作有记录、可撤销。
+- 永远不做永久删除：文件进废纸篓，删除前先备份，操作有记录、可撤销。
+- 撤销前先检查每一步能否完成，中途出错会回滚，不会只恢复一半。
 
 ## 贡献已知过时的 skill
 
@@ -158,7 +164,7 @@ There is nothing to install: the tool uses only the Python standard library and 
 - **Uninstall** removes one agent's symlink. **Delete** moves the folder to the Trash and removes every link to it.
 - **Model-aware scoring**: the model each agent runs is read from its own config file (for example `~/.codex/config.toml`) and mapped to a tier (frontier, mid-range, small). Apps that read every agent's folder, such as DSH, count too. You can correct detection in the Models dialog. Points for things strong models already do count 50% for mid-range and 20% for small models, and known-list verdicts relax the same way. The overall verdict follows the weakest model that can see a skill.
 - **Keep for one app only**: when a skill no longer helps Claude or GPT but a weaker-model app that reads every folder (such as DSH) might still use it, move it into that app's own folder (`~/.dsh/skills`) with one click. Undoable like everything else.
-- **Everything is undoable** from the History panel.
+- **Everything is undoable, even after you empty the Trash**: undo tries the Trash, then a backup taken right before deletion (kept 30 days in `~/.agent-skills-cleaner/backups`), then reinstalling from the source recorded at delete time (an installer's archive URL or git repo, or `git checkout` in a local repository). Undo checks every step first and rolls back on failure.
 - **Finds broken symlinks.**
 - **Safe by design**: the server listens on localhost only, uses a per-run token and Host checks, acts only on scanned skills and never deletes permanently.
 

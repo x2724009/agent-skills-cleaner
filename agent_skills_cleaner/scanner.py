@@ -130,10 +130,12 @@ def _load_locks():
         if not isinstance(skills, dict):
             continue
         for name, info in skills.items():
-            source = ""
+            source, source_url, source_type = "", "", ""
             if isinstance(info, dict):
                 source = info.get("source") or info.get("sourceUrl") or info.get("repo") or ""
-            managed[name] = {"lock": path, "source": source}
+                source_url = info.get("sourceUrl") or ""
+                source_type = info.get("sourceType") or ""
+            managed[name] = {"lock": path, "source": source, "source_url": source_url, "source_type": source_type}
     return managed
 
 

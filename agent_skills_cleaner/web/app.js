@@ -79,7 +79,7 @@
       pkgDelete: "整包删除",
       pkgUninstall: (a) => "从 " + a + " 卸载整包",
       confirmPkgDeleteTitle: (n, k) => "删除技能包 " + n + "（" + k + " 个技能）？",
-      confirmPkgDeleteBody: "包里每个技能的文件夹都会移到废纸篓，并解除所有链接。整包算一次操作，可以在操作记录里一键撤销：",
+      confirmPkgDeleteBody: "包里每个技能的文件夹都会移到废纸篓，并解除所有链接。删除前会自动备份，清空废纸篓后 30 天内也能在操作记录里一键撤销：",
       pkgKeepWarn: (n) => "注意：包里有 " + n + " 个技能被评为“建议保留”，也会一起删除。",
       pkgGuessWarn: "注意：这个包是按名称前缀推测的，请确认这些技能确实属于同一套。",
       confirmPkgUninstallTitle: (n, a) => "从 " + a + " 卸载技能包 " + n + "？",
@@ -114,7 +114,7 @@
       confirmUninstallBody: "只会移除这一个链接，技能原文件和其他工具里的链接都不受影响：",
       confirmDeleteTitle: (n) => "删除 " + n + "？",
       confirmBulkTitle: (n) => "删除 " + n + " 个技能？",
-      confirmDeleteBody: "技能文件夹会被移到废纸篓，所有指向它的链接都会被移除。之后可以在“操作记录”里撤销：",
+      confirmDeleteBody: "技能文件夹会被移到废纸篓，所有指向它的链接都会被移除。删除前会自动备份一份，即使清空了废纸篓，30 天内也能在“操作记录”里撤销：",
       moveToTrash: "移到废纸篓",
       unlinkFrom: "移除链接",
       outsideRoot: "注意：这个技能的原文件不在任何工具的技能目录里，而是在上面这个位置，它可能属于别的项目。",
@@ -126,7 +126,14 @@
       restored: "已撤销",
       restore: "撤销",
       noHistory: "还没有操作记录",
-      historyHint: "所有操作都会记在 ~/.agent-skills-cleaner/history.json，删除的文件在废纸篓里，随时可以恢复。",
+      historyHint: "所有操作都记在 ~/.agent-skills-cleaner/history.json。撤销时依次尝试：从废纸篓放回 → 从备份恢复（保留 30 天）→ 从原来的安装地址重新下载。",
+      undo_trash: "可从废纸篓放回",
+      undo_backup: "废纸篓已清空，可从备份恢复",
+      undo_reinstall: "可从原地址重新下载",
+      undo_links: "可恢复链接",
+      undo_none: "已无法撤销：废纸篓已清空，也没有备份或可重装的来源",
+      sourceLabel: "来源",
+      backedUp: "已备份",
       act_uninstall: "卸载",
       act_delete: "删除",
       "act_remove-broken": "移除失效链接",
@@ -206,7 +213,7 @@
       pkgDelete: "Delete package",
       pkgUninstall: (a) => "Uninstall from " + a,
       confirmPkgDeleteTitle: (n, k) => "Delete package " + n + " (" + k + " skills)?",
-      confirmPkgDeleteBody: "Every skill folder in the package goes to the Trash and every link is removed. The whole package is one action you can undo from History:",
+      confirmPkgDeleteBody: "Every skill folder in the package goes to the Trash and every link is removed. Each one is backed up first, so you can undo the whole package from History for 30 days, even after emptying the Trash:",
       pkgKeepWarn: (n) => "Note: " + n + " skills in this package are rated keep and will be deleted too.",
       pkgGuessWarn: "Note: this package was guessed from name prefixes. Check that these skills really belong together.",
       confirmPkgUninstallTitle: (n, a) => "Uninstall package " + n + " from " + a + "?",
@@ -241,7 +248,7 @@
       confirmUninstallBody: "Only this one link is removed. The skill's files and other agents' links stay:",
       confirmDeleteTitle: (n) => "Delete " + n + "?",
       confirmBulkTitle: (n) => "Delete " + n + " skills?",
-      confirmDeleteBody: "The skill folder goes to the Trash and every link to it is removed. You can undo this from History:",
+      confirmDeleteBody: "The skill folder goes to the Trash and every link to it is removed. It is backed up first, so you can undo this from History for 30 days, even after emptying the Trash:",
       moveToTrash: "Move to Trash",
       unlinkFrom: "Remove link",
       outsideRoot: "Note: this skill's files live outside every agent's skills folder (path above) and may belong to another project.",
@@ -253,7 +260,14 @@
       restored: "Undone",
       restore: "Undo",
       noHistory: "Nothing yet",
-      historyHint: "Every action is logged in ~/.agent-skills-cleaner/history.json and deleted files sit in the Trash, so everything can be restored.",
+      historyHint: "Every action is logged in ~/.agent-skills-cleaner/history.json. Undo tries, in order: the Trash, a backup (kept 30 days), then reinstalling from where the skill came from.",
+      undo_trash: "In the Trash",
+      undo_backup: "Trash emptied; restorable from backup",
+      undo_reinstall: "Can be re-downloaded from its source",
+      undo_links: "Links can be restored",
+      undo_none: "Can no longer be undone: the Trash was emptied and there is no backup or known source",
+      sourceLabel: "Source",
+      backedUp: "backed up",
       act_uninstall: "Uninstall",
       act_delete: "Delete",
       "act_remove-broken": "Remove broken link",
@@ -741,11 +755,16 @@
     if (!list.length) { el.innerHTML = "<p class='empty'>" + esc(t("noHistory")) + "</p>"; return; }
     el.innerHTML = list.map((e) => {
       const when = new Date(e.time * 1000).toLocaleString(lang === "zh" ? "zh-CN" : "en");
-      const steps = e.steps.map((s) => "<li>" + (s.op === "move" ? esc(home(s.src)) + " → " + esc(t("moveToTrash")) : esc(t("unlinkFrom")) + " " + esc(home(s.path))) + "</li>").join("");
+      const steps = e.steps.map((s) => "<li>" + (s.op === "move"
+        ? esc(home(s.src)) + " → " + esc(s.dst.indexOf("/.Trash") >= 0 || s.dst.indexOf("Trash/") >= 0 ? t("moveToTrash") : home(s.dst)) +
+          (s.backup ? " · " + esc(t("backedUp")) : "") +
+          (s.source && s.source.label ? " · " + esc(t("sourceLabel")) + ": " + esc(s.source.label) : "")
+        : esc(t("unlinkFrom")) + " " + esc(home(s.path))) + "</li>").join("");
+      const undo = e.restored ? null : e.undo === "none" ? "none" : (e.undo || []).indexOf("reinstall") >= 0 ? "reinstall" : (e.undo || []).indexOf("backup") >= 0 ? "backup" : (e.undo || []).length ? (e.undo[0] === "links" ? "links" : "trash") : null;
       return "<div class='hist" + (e.restored ? " restored" : "") + "'><div class='hist-head'><span><b>" + esc(t("act_" + e.action) || e.action) + "</b> " + esc(e.name) +
         "<br><span class='muted'>" + esc(when) + "</span></span>" +
-        (e.restored ? "<span class='muted'>" + esc(t("restored")) + "</span>" : CFG.readonly ? "" : "<button class='small' data-restore='" + esc(e.id) + "'>" + esc(t("restore")) + "</button>") +
-        "</div><ul>" + steps + "</ul></div>";
+        (e.restored ? "<span class='muted'>" + esc(t("restored")) + "</span>" : CFG.readonly || undo === "none" ? "" : "<button class='small' data-restore='" + esc(e.id) + "'>" + esc(t("restore")) + "</button>") +
+        "</div>" + (undo ? "<p class='undo-state " + undo + "'>" + esc(t("undo_" + undo)) + "</p>" : "") + "<ul>" + steps + "</ul></div>";
     }).join("");
   }
 
