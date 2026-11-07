@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 
-from skillmolt import actions
+from skillmolt import actions, config
 from skillmolt.analyzer import analyze
 from skillmolt.scanner import parse_frontmatter, scan
 
@@ -118,6 +118,29 @@ class SkillTest(unittest.TestCase):
         self.assertTrue(os.path.islink(os.path.join(self.agent, "be-careful")))
         with self.assertRaises(actions.ActionError):
             actions.restore(entry["id"])
+
+
+class ConfigTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self._saved = actions.STATE_DIR
+        actions.STATE_DIR = self.tmp
+
+    def tearDown(self):
+        actions.STATE_DIR = self._saved
+        shutil.rmtree(self.tmp)
+
+    def test_defaults_then_save(self):
+        self.assertEqual(config.load_config()["agents"]["Codex"]["model"], "GPT")
+        config.save_config({"agents": {"Codex": {"model": "GPT 6.1", "tier": "frontier"}, "DSH": {"model": "DeepSeek flash", "tier": "mid"}}})
+        agents = config.load_config()["agents"]
+        self.assertEqual(agents["Codex"]["model"], "GPT 6.1")
+        self.assertEqual(agents["DSH"]["tier"], "mid")
+        self.assertEqual(agents["Claude Code"]["model"], "Claude")
+
+    def test_rejects_unknown_tier(self):
+        with self.assertRaises(ValueError):
+            config.save_config({"agents": {"X": {"model": "m", "tier": "huge"}}})
 
 
 class PackageTest(unittest.TestCase):

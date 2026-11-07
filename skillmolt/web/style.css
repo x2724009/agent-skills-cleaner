@@ -316,3 +316,19 @@ dialog ul { padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; max-he
 .agents button .n { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12px; }
 .agents button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .agents button[aria-pressed="true"] .n { color: var(--accent); }
+
+/* Models */
+.agents button .model { color: var(--muted); font-weight: 400; }
+.agents button[aria-pressed="true"] .model { color: var(--accent); opacity: .8; }
+.agents .edit-models { color: var(--accent); border-color: transparent; }
+.atag i { font-style: normal; opacity: .7; margin-left: 5px; }
+.models-grid { display: grid; gap: 8px; margin-top: 14px; }
+.model-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 120px; gap: 8px; align-items: center; }
+.model-row .agent { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+.model-row input, .model-row select {
+  height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg); min-width: 0;
+}
+@media (max-width: 560px) {
+  .model-row { grid-template-columns: minmax(0, 1fr) 110px; }
+  .model-row .agent { grid-column: 1 / -1; }
+}

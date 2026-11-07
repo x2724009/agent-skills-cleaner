@@ -23,6 +23,17 @@
       search: "搜索名称或介绍…",
       allAgents: "全部工具",
       agentsLabel: "所在工具",
+      editModels: "设置模型",
+      modelsTitle: "每个工具用的是什么模型",
+      modelsHint: "这里填的模型会标在工具旁边。档位先记录下来，之后评分会按档位调整：同一个流程型技能，对前沿模型是累赘，对小模型可能还有用。",
+      modelPlaceholder: "例如 Claude Opus 5.5",
+      tierUnset: "档位未设置",
+      tier_frontier: "前沿模型",
+      tier_mid: "中档模型",
+      tier_small: "小模型",
+      save: "保存",
+      saved: "模型设置已保存",
+      noModel: "未设置模型",
       total: "全部技能",
       remove: "建议删除",
       consider: "可以考虑",
@@ -117,6 +128,17 @@
       search: "Search name or description…",
       allAgents: "All agents",
       agentsLabel: "Agent",
+      editModels: "Set models",
+      modelsTitle: "Which model each agent runs",
+      modelsHint: "The model you enter is shown next to each agent. The tier is saved for scoring: a process-style skill that slows a frontier model down may still help a small one.",
+      modelPlaceholder: "e.g. Claude Opus 5.5",
+      tierUnset: "Tier not set",
+      tier_frontier: "Frontier",
+      tier_mid: "Mid-range",
+      tier_small: "Small",
+      save: "Save",
+      saved: "Models saved",
+      noModel: "No model set",
       total: "All skills",
       remove: "Remove",
       consider: "Consider",
@@ -201,6 +223,10 @@
 
   let report = null;
   let agentFilter = "";
+  let modelCfg = { agents: {} };
+  const modelOf = (a) => (modelCfg.agents[a] || {}).model || "";
+  const tierOf = (a) => (modelCfg.agents[a] || {}).tier || "";
+  const agentTitle = (a) => a + " · " + (modelOf(a) || t("noModel")) + (tierOf(a) ? " · " + t("tier_" + tierOf(a)) : "");
   let filter = "all";
   const selected = new Set();
 
@@ -303,7 +329,8 @@
   function renderRow(s) {
     const isOpen = open.has(s.id);
     const agentsList = [...new Set(s.installs.map((i) => i.agent))];
-    const where = agentsList.map((a) => "<span class='atag" + (a === agentFilter ? " on" : "") + "'>" + esc(a) + "</span>").join("");
+    const where = agentsList.map((a) => "<span class='atag" + (a === agentFilter ? " on" : "") + "' title='" + esc(agentTitle(a)) + "'>" + esc(a) +
+      (modelOf(a) ? "<i>" + esc(modelOf(a)) + "</i>" : "") + "</span>").join("");
     const checked = selected.has(s.id) ? " checked" : "";
 
     let detail = "";
@@ -439,7 +466,10 @@
     const count = (a) => report.skills.filter((s) => s.installs.some((i) => i.agent === a)).length;
     const items = [["", t("allAgents"), report.skills.length]].concat(list.map((a) => [a, a, count(a)]));
     $("#agents").innerHTML = "<span class='agents-label'>" + esc(t("agentsLabel")) + "</span>" + items.map(([v, label, n]) =>
-      "<button data-agent-filter='" + esc(v) + "' aria-pressed='" + (agentFilter === v) + "'>" + esc(label) + "<span class='n'>" + n + "</span></button>").join("");
+      "<button data-agent-filter='" + esc(v) + "' aria-pressed='" + (agentFilter === v) + "'" + (v ? " title='" + esc(agentTitle(v)) + "'" : "") + ">" + esc(label) +
+      (v && modelOf(v) ? "<span class='model'>" + esc(modelOf(v)) + "</span>" : "") +
+      "<span class='n'>" + n + "</span></button>").join("") +
+      "<button class='ghost small edit-models' data-edit-models>" + esc(t("editModels")) + "</button>";
   }
 
 
@@ -456,7 +486,9 @@
   async function load() {
     $("#btn-rescan").disabled = true;
     try {
-      report = await api("/api/scan");
+      const [r, cfg] = await Promise.all([api("/api/scan"), api("/api/config").catch(() => modelCfg)]);
+      report = r;
+      modelCfg = cfg;
       const ids = new Set(report.skills.map((s) => s.id));
       [...selected].forEach((id) => { if (!ids.has(id)) selected.delete(id); });
       render();
@@ -551,6 +583,33 @@
     await load();
   }
 
+  function openModels() {
+    const dlg = $("#models");
+    $("#models-body").innerHTML = agents().map((a, i) =>
+      "<label class='model-row' for='model-" + i + "'><span class='agent'>" + esc(a) + "</span>" +
+      "<input id='model-" + i + "' data-model-agent='" + esc(a) + "' value='" + esc(modelOf(a)) + "' placeholder='" + esc(t("modelPlaceholder")) + "' maxlength='80'>" +
+      "<select id='tier-" + i + "' aria-label='" + esc(a) + "'>" +
+      ["", "frontier", "mid", "small"].map((v) => "<option value='" + v + "'" + (tierOf(a) === v ? " selected" : "") + ">" + esc(v ? t("tier_" + v) : t("tierUnset")) + "</option>").join("") +
+      "</select></label>").join("");
+    dlg.returnValue = "";
+    dlg.onclose = async () => {
+      if (dlg.returnValue !== "ok") return;
+      const agentsCfg = Object.assign({}, modelCfg.agents);
+      dlg.querySelectorAll("[data-model-agent]").forEach((input, i) => {
+        agentsCfg[input.dataset.modelAgent] = { model: input.value.trim(), tier: $("#tier-" + i).value };
+      });
+      try {
+        modelCfg = await api("/api/config", { agents: agentsCfg });
+        toast(t("saved"));
+      } catch (e) {
+        toast(t("error") + e.message);
+      }
+      renderAgents();
+      renderList();
+    };
+    dlg.showModal();
+  }
+
   async function doRestore(id) {
     try {
       await api("/api/restore", { entry_id: id });
@@ -616,6 +675,8 @@
     else if (d.restore) doRestore(d.restore);
     else if (d.undo) { $("#toast").hidden = true; doRestore(d.undo); }
     else if (d.toggle) toggleRow(d.toggle);
+    else if (d.editModels !== undefined) openModels();
+    else if (d.closeModels !== undefined) $("#models").close();
     else if (d.agentFilter !== undefined) { agentFilter = d.agentFilter; renderAgents(); renderList(); }
     else if (d.pkgToggle) togglePkg(d.pkgToggle);
     else if (d.pkgDelete) doDeletePackage(d.pkgDelete);

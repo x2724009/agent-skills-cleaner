@@ -10,7 +10,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import __version__, actions
+from . import __version__, actions, config
 from .analyzer import analyze
 from .scanner import scan
 
@@ -100,6 +100,8 @@ def make_handler(state, port):
                 return self._send(200, state.rescan())
             if path == "/api/history":
                 return self._send(200, actions.load_history())
+            if path == "/api/config":
+                return self._send(200, config.load_config())
             self._send(404, {"error": "not found"})
 
         def do_POST(self):
@@ -113,6 +115,11 @@ def make_handler(state, port):
             path = self.path.split("?", 1)[0]
             if path == "/api/reveal":
                 return self._reveal(data)
+            if path == "/api/config":
+                try:
+                    return self._send(200, config.save_config(data))
+                except (ValueError, OSError) as e:
+                    return self._send(400, {"error": str(e)})
             if state.readonly:
                 return self._send(403, {"error": "read-only mode"})
             try:
