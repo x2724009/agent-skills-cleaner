@@ -300,7 +300,31 @@ def analyze_with_models(roots=None, known=None):
 
     result = scan(roots)
     names = [r["agent"] for r in result["roots"] if r["exists"]]
-    profile = models.effective_profile(models.detect(), config.load_config()["agents"], names)
+    detected = models.detect()
+    profile = models.effective_profile(detected, config.load_config()["agents"], names)
     report = analyze(result, known=known, agent_tiers={k: v["effective"] for k, v in profile.items()})
     report["profile"] = profile
+    report["readers"] = [{"name": r["name"], "model": r["model"], "tier": r["tier"], "home": r.get("home")}
+                         for r in detected["readers"] if r.get("home")]
+    _flag_reader_only(report, profile)
     return report
+
+
+def _flag_reader_only(report, profile):
+    """Mark skills that the agents' own models no longer need but a weaker
+    reader app (DSH) might: the fix is to keep them for that app only."""
+    readers = report["readers"]
+    if not readers:
+        return
+    names = {r["name"] for r in readers}
+    for s in report["skills"]:
+        s["reader_hint"] = None
+        agents = [i["agent"] for i in s["installs"] if i["agent"] not in names]
+        if not agents:
+            continue
+        own = max(((profile.get(a) or {}).get("tier") or "frontier" for a in agents), key=TIERS.index)
+        own_v = s["tiers"][own]
+        movable = any(i["kind"] == "folder" for i in s["installs"])
+        if own_v["verdict"] != "keep" and s["verdict"] != own_v["verdict"]:
+            s["reader_hint"] = {"reader": readers[0]["name"], "own_tier": own, "own_score": own_v["score"],
+                                "own_verdict": own_v["verdict"], "movable": movable}

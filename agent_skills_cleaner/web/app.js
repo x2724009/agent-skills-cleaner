@@ -86,6 +86,16 @@
       confirmPkgUninstallBody: "只解除该工具里的这些链接，技能文件和其他工具不受影响：",
       "act_delete-package": "删除技能包",
       "act_uninstall-package": "卸载技能包",
+      "act_keep-for": "只留给某个应用",
+      keepFor: (r) => "只留给 " + r,
+      keepPkgFor: (r) => "整包只留给 " + r,
+      readerTag: (r) => "可只留给 " + r,
+      readerFilter: (r) => "可只留给 " + r,
+      readerHint: (r, m, tier, v, score) => "对只用前沿模型的工具（Claude、GPT）来说，它是「" + v + "」（" + score + " 分）。但 " + r + " 用的 " + m + " 是" + tier + "，可能还用得上。可以只留给 " + r + "：从其他工具里移除，只让 " + r + " 读到。",
+      notMovable: "它的本体在 git 仓库等其他项目里，为了不破坏那个项目，这里不自动移动，请手动处理。",
+      confirmKeepTitle: (n, r) => "把 " + n + " 只留给 " + r + "？",
+      confirmKeepBody: (r, home) => "会移除其他工具里的链接，并把技能文件夹移到 " + home + "，之后只有 " + r + " 能读到。可以在操作记录里撤销：",
+      moveTo: "移到",
       known: "已知过时",
       link: "链接",
       folder: "本体",
@@ -203,6 +213,16 @@
       confirmPkgUninstallBody: "Only these links in that agent are removed. Skill files and other agents stay:",
       "act_delete-package": "Delete package",
       "act_uninstall-package": "Uninstall package",
+      "act_keep-for": "Keep for one app",
+      keepFor: (r) => "Keep for " + r + " only",
+      keepPkgFor: (r) => "Keep package for " + r + " only",
+      readerTag: (r) => r + " only?",
+      readerFilter: (r) => "Keep for " + r,
+      readerHint: (r, m, tier, v, score) => "For agents that only run frontier models (Claude, GPT) this is \"" + v + "\" (" + score + "). " + r + " runs " + m + ", a " + tier + " model that may still use it. You can keep it for " + r + " only: it is removed from every other agent.",
+      notMovable: "Its files live in another project (such as a git repository). Move it by hand so that project is not broken.",
+      confirmKeepTitle: (n, r) => "Keep " + n + " for " + r + " only?",
+      confirmKeepBody: (r, home) => "Links in other agents are removed and the skill folder moves to " + home + ", where only " + r + " reads it. You can undo this from History:",
+      moveTo: "Move to",
       known: "Known stale",
       link: "link",
       folder: "folder",
@@ -324,7 +344,8 @@
     const q = $("#q").value.trim().toLowerCase();
     const agent = agentFilter;
     return report.skills.filter((s) => {
-      if (filter !== "all" && filter !== "broken" && eff(s).verdict !== filter) return false;
+      if (filter === "reader") { if (!s.reader_hint) return false; }
+      else if (filter !== "all" && filter !== "broken" && eff(s).verdict !== filter) return false;
       if (filter === "broken") return false;
       if (agent && !s.installs.some((i) => i.agent === agent)) return false;
       if (q && !(s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))) return false;
@@ -359,6 +380,8 @@
       ["consider", c.consider, t("consider")],
       ["keep", c.keep, t("keep")],
     ];
+    const hinted = pool.filter((s) => s.reader_hint).length;
+    if (hinted) items.push(["reader", hinted, t("readerFilter", report.readers[0].name)]);
     if (report.broken.length) items.push(["broken", report.broken.length, t("broken")]);
     $("#summary").innerHTML = items.map(([k, num, l]) =>
       "<button data-filter='" + k + "' aria-pressed='" + (filter === k) + "'>" +
@@ -398,6 +421,7 @@
         "<p class='meta'>" + esc(agentFilter && s.agent_tiers[agentFilter] ? t("judgedForAgent", agentFilter, tierName(e.tier)) : t("judgedWhy")) + "</p></div>" +
         "<div><div class='label'>" + esc(t("installedIn")) + "</div><div class='installs'>" + installs + "</div>" +
         "<p class='meta mono'>" + esc(home(s.real_path)) + " · " + s.skill_md_lines + " " + esc(t("lines")) + " · " + size(s.stats.bytes) + "</p></div>" +
+        (s.reader_hint ? readerBox(s) : "") +
         "<div class='full detail-foot'>" +
         "<button class='small ghost' data-reveal='" + esc(s.id) + "'>" + esc(t("reveal")) + "</button>" +
         (CFG.readonly ? "" : "<button class='small danger' data-delete='" + esc(s.id) + "'>" + esc(t("delete")) + "</button>") +
@@ -410,6 +434,7 @@
       (CFG.readonly ? "" : "<label class='check'><input type='checkbox' data-select='" + esc(s.id) + "'" + checked + " aria-label='" + esc(t("select") + " " + s.name) + "'></label>") +
       "<div class='who'><h3 class='name'><span class='nm'>" + esc(s.name) + "</span>" +
       (s.known ? "<span class='tag'>" + esc(t("known")) + "</span>" : "") +
+      (s.reader_hint ? "<span class='tag hint'>" + esc(t("readerTag", s.reader_hint.reader)) + "</span>" : "") +
       (s.package && view === "verdict" ? "<span class='tag pkg-tag'>" + esc(pkgById(s.package).name) + "</span>" : "") + "</h3>" +
       "<p class='desc'>" + esc(s.description || "—") + "</p></div>" +
       "<div class='where'>" + where + "</div>" +
@@ -473,6 +498,7 @@
         html += "<div class='pkg-body'><div class='pkg-actions'>" +
           (p.detail ? "<span class='meta mono'>" + esc(t("pkgSource")) + ": " + esc(home(p.detail)) + "</span>" : "<span></span>") +
           "<span class='acts'>" + agentsBtns +
+          (CFG.readonly || !report.readers || !report.readers.length ? "" : "<button class='small' data-pkg-keep='" + esc(p.id) + "'>" + esc(t("keepPkgFor", report.readers[0].name)) + "</button>") +
           (CFG.readonly ? "" : "<button class='small danger' data-pkg-delete='" + esc(p.id) + "'>" + esc(t("pkgDelete")) + "</button>") +
           "</span></div><div class='rows'>" + members.map(renderRow).join("") + "</div></div>";
       }
@@ -587,6 +613,38 @@
     try {
       const r = await api("/api/uninstall", { skill_id: id, path });
       toast(t("done") + " · " + s.name, r.entry.id);
+    } catch (e) {
+      toast(t("error") + e.message);
+    }
+    await load();
+  }
+
+  function readerBox(s) {
+    const h = s.reader_hint;
+    const r = report.readers.find((x) => x.name === h.reader) || { model: "?", tier: "mid" };
+    const tn = lang === "en" ? tierName(r.tier || "mid").toLowerCase() : tierName(r.tier || "mid");
+    return "<div class='full hint-box'><p>" + esc(t("readerHint", h.reader, r.model || "?", tn, t(h.own_verdict), h.own_score)) + "</p>" +
+      (h.movable
+        ? (CFG.readonly ? "" : "<button class='small' data-keep-for='" + esc(s.id) + "'>" + esc(t("keepFor", h.reader)) + "</button>")
+        : "<p class='muted'>" + esc(t("notMovable")) + "</p>") + "</div>";
+  }
+
+  function keepPlan(s, r) {
+    const links = s.installs.filter((i) => i.kind === "link");
+    return "<ul>" + links.map((i) => "<li>" + esc(t("unlinkFrom")) + " (" + esc(i.agent) + "): <code>" + esc(home(i.path)) + "</code></li>").join("") +
+      "<li>" + esc(t("moveTo")) + ": <code>" + esc(home(r.home)) + "/" + esc(s.real_path.split("/").pop()) + "</code></li></ul>";
+  }
+
+  async function doKeepFor(ids, pid) {
+    const r = report.readers[0];
+    const skills = ids.map(skillById).filter(Boolean);
+    const title = pid ? t("confirmKeepTitle", pkgById(pid).name, r.name) : t("confirmKeepTitle", skills[0].name, r.name);
+    const body = "<p>" + esc(t("confirmKeepBody", r.name, home(r.home))) + "</p>" +
+      skills.map((s) => (skills.length > 1 ? "<h3>" + esc(s.name) + "</h3>" : "") + keepPlan(s, r)).join("");
+    if (!(await confirmDialog(title, body, t("keepFor", r.name)))) return;
+    try {
+      const res = await api("/api/keep-for", pid ? { package_id: pid, reader: r.name } : { skill_id: skills[0].id, reader: r.name });
+      toast(t("done") + " · " + (pid ? pkgById(pid).name : skills[0].name) + " → " + r.name, res.entry.id);
     } catch (e) {
       toast(t("error") + e.message);
     }
@@ -736,6 +794,8 @@
     else if (d.agentFilter !== undefined) { agentFilter = d.agentFilter; renderAgents(); renderSummary(); renderList(); }
     else if (d.pkgToggle) togglePkg(d.pkgToggle);
     else if (d.pkgDelete) doDeletePackage(d.pkgDelete);
+    else if (d.keepFor) doKeepFor([d.keepFor]);
+    else if (d.pkgKeep) doKeepFor(pkgById(d.pkgKeep).skill_ids, d.pkgKeep);
     else if (d.pkgUninstall) doUninstallPackage(d.pkgUninstall, d.agent);
     else if (d.view) {
       view = d.view;

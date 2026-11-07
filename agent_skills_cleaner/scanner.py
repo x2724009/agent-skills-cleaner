@@ -28,6 +28,7 @@ DEFAULT_ROOTS = [
     ("Qoder", "~/.qoder/skills"),
     ("CodeBuddy", "~/.codebuddy/skills"),
     ("WorkBuddy", "~/.workbuddy/skills"),
+    ("DSH", "~/.dsh/skills"),
 ]
 
 LOCK_FILES = ["~/.agents/.skill-lock.json"]

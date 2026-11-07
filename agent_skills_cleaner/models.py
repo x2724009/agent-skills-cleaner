@@ -107,7 +107,10 @@ DSH_SOURCE_AGENTS = {
     "cursor": "Cursor", "gemini": "Gemini CLI", "copilot": "GitHub Copilot",
     "opencode": "OpenCode", "windsurf": "Windsurf", "trae": "Trae",
     "qoder": "Qoder", "codebuddy": "CodeBuddy", "workbuddy": "WorkBuddy", "kiro": "Kiro",
+    "dsh": "DSH",
 }
+# Folders only one reader app loads, used to hide a skill from everyone else.
+READER_HOMES = {"DSH": "~/.dsh/skills"}
 
 
 def _dsh_reader():
@@ -124,7 +127,8 @@ def _dsh_reader():
             pass
     if not reads:
         return None
-    return {"name": "DSH", "model": model or "", "tier": tier_for_model(model), "source": source or "~/.dsh", "reads": reads}
+    return {"name": "DSH", "model": model or "", "tier": tier_for_model(model), "source": source or "~/.dsh",
+            "reads": reads, "home": os.path.expanduser(READER_HOMES["DSH"])}
 
 
 def detect():
@@ -142,6 +146,8 @@ def detect():
         if model:
             agents[name] = {"model": model, "tier": tier_for_model(model), "source": source}
     readers = [r for r in (_dsh_reader(),) if r]
+    for r in readers:  # a reader's own folder is that reader's agent entry
+        agents.setdefault(r["name"], {"model": r["model"], "tier": r["tier"], "source": r["source"]})
     return {"agents": agents, "readers": readers}
 
 

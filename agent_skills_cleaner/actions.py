@@ -163,6 +163,42 @@ def uninstall_package(name, skills, agent):
     return _record("uninstall-package", "%s · %s" % (name, agent), steps)
 
 
+def _keep_for_steps(skill, dest_dir):
+    """Move one skill into a folder only a specific app reads, dropping every other link."""
+    if not any(i["kind"] == "folder" for i in skill["installs"]):
+        raise ActionError("%s lives outside the agents' skills folders (for example in a git repository); "
+                          "move it by hand so that project is not broken" % skill["name"])
+    real = skill["real_path"]
+    dest = os.path.join(dest_dir, os.path.basename(real))
+    if os.path.lexists(dest):
+        raise ActionError("%s already exists" % dest)
+    if os.path.realpath(os.path.dirname(real)) == os.path.realpath(dest_dir):
+        raise ActionError("%s is already there" % skill["name"])
+    steps = []
+    for install in skill["installs"]:
+        if install["kind"] == "link" and os.path.islink(install["path"]):
+            steps.append(_unlink(install["path"]))
+    os.makedirs(dest_dir, exist_ok=True)
+    shutil.move(real, dest)
+    steps.append({"op": "move", "src": real, "dst": dest})
+    return steps
+
+
+def keep_for(skill, reader, dest_dir):
+    """Hide a skill from every agent except one app (e.g. DSH), as one undoable action."""
+    return _record("keep-for", "%s → %s" % (skill["name"], reader), _keep_for_steps(skill, dest_dir))
+
+
+def keep_package_for(name, skills, reader, dest_dir):
+    steps = []
+    for skill in skills:
+        try:
+            steps.extend(_keep_for_steps(skill, dest_dir))
+        except (ActionError, OSError) as e:
+            _record_partial("keep-for", "%s → %s" % (name, reader), steps, "%s: %s" % (skill["name"], e))
+    return _record("keep-for", "%s → %s" % (name, reader), steps)
+
+
 def remove_broken(link_path, name):
     """Remove a symlink whose target no longer exists."""
     if not os.path.islink(link_path) or os.path.exists(link_path):
@@ -184,7 +220,7 @@ def restore(entry_id):
             if os.path.exists(step["src"]):
                 raise ActionError("something already exists at %s" % step["src"])
             if not os.path.exists(step["dst"]):
-                raise ActionError("no longer in the Trash: %s" % step["dst"])
+                raise ActionError("no longer at %s" % step["dst"])
             shutil.move(step["dst"], step["src"])
         elif step["op"] == "unlink":
             if not os.path.lexists(step["path"]):

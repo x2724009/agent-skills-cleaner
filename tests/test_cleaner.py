@@ -117,6 +117,18 @@ class SkillTest(unittest.TestCase):
         actions.restore(entry["id"])
         self.assertEqual(os.path.realpath(link), os.path.realpath(self.prompt))
 
+    def test_keep_for_moves_folder_and_drops_links(self):
+        s = self.by_name("be-careful")
+        home = os.path.join(self.tmp, "dsh-skills")
+        entry = actions.keep_for(s, "DSH", home)
+        self.assertTrue(os.path.isfile(os.path.join(home, "be-careful", "SKILL.md")))
+        self.assertFalse(os.path.exists(self.prompt))
+        self.assertFalse(os.path.lexists(os.path.join(self.agent, "be-careful")))
+        actions.restore(entry["id"])
+        self.assertTrue(os.path.isfile(os.path.join(self.prompt, "SKILL.md")))
+        self.assertTrue(os.path.islink(os.path.join(self.agent, "be-careful")))
+        self.assertFalse(os.path.exists(os.path.join(home, "be-careful")))
+
     def test_uninstall_refuses_real_folder(self):
         s = self.by_name("be-careful")
         with self.assertRaises(actions.ActionError):

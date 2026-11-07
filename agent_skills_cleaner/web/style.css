@@ -337,3 +337,11 @@ dialog ul { padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; max-he
 .model-row .src { font-weight: 400; font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
 .model-row { grid-template-columns: 170px minmax(0, 1fr) 130px; }
 .reader-note { margin-top: 8px; background: var(--consider-soft); color: var(--consider); padding: 8px 10px; border-radius: 8px; }
+
+/* Keep for one reader app (DSH) */
+.tag.hint { color: var(--consider); border-color: color-mix(in srgb, var(--consider) 40%, var(--line)); }
+.hint-box { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  background: var(--consider-soft); color: var(--consider); border-radius: 8px; padding: 10px 12px; }
+.hint-box p { margin: 0; flex: 1 1 320px; max-width: 80ch; }
+.hint-box .muted { color: inherit; opacity: .8; }
+.dot.reader { background: var(--consider); }

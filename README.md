@@ -85,6 +85,7 @@ python3 -m agent_skills_cleaner --root "MyAgent=~/my/skills" serve   # 扫描指
 - 纯提示词、强制指令、套娃调用、固定流程、通用建议这几项"模型自己会的"加分，中档模型只算 50%，小模型只算 20%。
 - 已知清单的结论也随档位放宽：前沿"建议删除" → 中档"可以考虑" → 小模型"建议保留"。规则里可以用 `by_tier` 单独指定。
 - 删除会让所有读取它的模型都失去这个 skill，所以**结论按能看到它的最弱模型**来定。
+- **只留给某个应用**：一个 skill 对 Claude、GPT 已经没用，但 DSH 这类用较弱模型、又会读所有目录的应用可能还用得上时，网页会标出"可只留给 DSH"。点一下就会移除其他工具里的链接，把文件夹移到 `~/.dsh/skills`，之后只有 DSH 读得到。和删除一样可以撤销。本体在 git 仓库等其他项目里的 skill 不会被自动移动。
 - 识别不到模型的工具按前沿模型算。手动修改保存在 `~/.agent-skills-cleaner/config.json`。
 
 社区维护的[已知过时清单](agent_skills_cleaner/data/known.json)优先于自动规则。比如 superpowers 系列、`karpathy-guidelines`、`full-output-enforcement`。
@@ -156,6 +157,7 @@ There is nothing to install: the tool uses only the Python standard library and 
 - **Packages**: skills installed together (for example lark-* or superpowers) are grouped, and a whole package can be uninstalled or deleted as one undoable action. Packages are detected from installer lock files, plugin manifests, git repositories, the known list, a shared folder, and finally shared name prefixes (marked as a guess).
 - **Uninstall** removes one agent's symlink. **Delete** moves the folder to the Trash and removes every link to it.
 - **Model-aware scoring**: the model each agent runs is read from its own config file (for example `~/.codex/config.toml`) and mapped to a tier (frontier, mid-range, small). Apps that read every agent's folder, such as DSH, count too. You can correct detection in the Models dialog. Points for things strong models already do count 50% for mid-range and 20% for small models, and known-list verdicts relax the same way. The overall verdict follows the weakest model that can see a skill.
+- **Keep for one app only**: when a skill no longer helps Claude or GPT but a weaker-model app that reads every folder (such as DSH) might still use it, move it into that app's own folder (`~/.dsh/skills`) with one click. Undoable like everything else.
 - **Everything is undoable** from the History panel.
 - **Finds broken symlinks.**
 - **Safe by design**: the server listens on localhost only, uses a per-run token and Host checks, acts only on scanned skills and never deletes permanently.
