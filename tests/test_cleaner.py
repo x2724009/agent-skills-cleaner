@@ -129,6 +129,15 @@ class SkillTest(unittest.TestCase):
         self.assertTrue(os.path.islink(os.path.join(self.agent, "be-careful")))
         self.assertFalse(os.path.exists(os.path.join(home, "be-careful")))
 
+    def test_restore_checks_everything_before_acting(self):
+        s = self.by_name("be-careful")
+        entry = actions.delete(s)
+        trashed = [st["dst"] for st in entry["steps"] if st["op"] == "move"][0]
+        shutil.rmtree(trashed)  # e.g. the Trash was emptied
+        with self.assertRaises(actions.ActionError):
+            actions.restore(entry["id"])
+        self.assertFalse(os.path.lexists(os.path.join(self.agent, "be-careful")))  # no half-restore
+
     def test_uninstall_refuses_real_folder(self):
         s = self.by_name("be-careful")
         with self.assertRaises(actions.ActionError):

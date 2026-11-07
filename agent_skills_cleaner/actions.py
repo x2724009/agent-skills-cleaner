@@ -207,6 +207,28 @@ def remove_broken(link_path, name):
     return _record("remove-broken", name, [step])
 
 
+def _explain(err):
+    if isinstance(err, PermissionError) and ".Trash" in str(err):
+        return ("macOS blocked access to the Trash (%s). Run this tool from a terminal app that has "
+                "Full Disk Access (System Settings > Privacy & Security), or put the folder back from Finder." % err)
+    return str(err)
+
+
+def _check_restorable(steps):
+    """Fail before touching anything if any step cannot be undone."""
+    for step in steps:
+        if step["op"] != "move":
+            continue
+        if os.path.lexists(step["src"]):
+            raise ActionError("something already exists at %s" % step["src"])
+        try:
+            os.listdir(os.path.dirname(step["dst"]))
+        except OSError as e:
+            raise ActionError(_explain(e))
+        if not os.path.exists(step["dst"]):
+            raise ActionError("no longer at %s" % step["dst"])
+
+
 def restore(entry_id):
     history = load_history()
     entry = next((e for e in history if e["id"] == entry_id), None)
@@ -214,17 +236,27 @@ def restore(entry_id):
         raise ActionError("unknown history entry")
     if entry["restored"]:
         raise ActionError("already restored")
-    # Undo in reverse order: put the folder back before relinking to it.
-    for step in reversed(entry["steps"]):
-        if step["op"] == "move":
-            if os.path.exists(step["src"]):
-                raise ActionError("something already exists at %s" % step["src"])
-            if not os.path.exists(step["dst"]):
-                raise ActionError("no longer at %s" % step["dst"])
-            shutil.move(step["dst"], step["src"])
-        elif step["op"] == "unlink":
-            if not os.path.lexists(step["path"]):
+    steps = list(reversed(entry["steps"]))  # put folders back before relinking to them
+    _check_restorable(steps)
+    done = []
+    try:
+        for step in steps:
+            if step["op"] == "move":
+                shutil.move(step["dst"], step["src"])
+                done.append(step)
+            elif step["op"] == "unlink" and not os.path.lexists(step["path"]):
                 os.symlink(step["target"], step["path"])
+                done.append(step)
+    except OSError as e:
+        for step in reversed(done):  # leave things exactly as they were
+            try:
+                if step["op"] == "move":
+                    shutil.move(step["src"], step["dst"])
+                else:
+                    os.unlink(step["path"])
+            except OSError:
+                pass
+        raise ActionError(_explain(e))
     entry["restored"] = True
     entry["restored_at"] = time.time()
     _save_history(history)
