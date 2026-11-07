@@ -14,7 +14,9 @@ SkillMolt 会：
 2. **判断**：给每个 skill 打一个**拖累指数**并写清理由。
 3. **清理**：在本地网页里卸载或删除，删除只进废纸篓，每一步都能撤销。
 
-**规划中**：按每个工具实际使用的模型分别评判（弱一些的模型可能仍需要流程型 skill），以及从本地会话记录统计每个 skill 的实际使用频率。
+**按模型评判**：给每个工具标上它用的模型和档位（前沿 / 中档 / 小模型），同一个 skill 对不同档位给出不同结论。
+
+**规划中**：从本地会话记录统计每个 skill 的实际使用频率。
 
 ## 功能
 
@@ -67,6 +69,15 @@ python3 -m skillmolt --root "MyAgent=~/my/skills" serve   # 扫描指定目录
 | 附带参考资料 | −10 | 可能包含模型不知道的规范 |
 
 **≥60 建议删除，35–59 可以考虑，<35 建议保留。**
+
+### 按模型档位评分
+
+同一个流程型 skill，对前沿模型是累赘，对小模型可能还有用。所以在网页的"设置模型"里给每个工具填上它用的模型和档位后：
+
+- 纯提示词、强制指令、套娃调用、固定流程、通用建议这几项"模型自己会的"加分，中档模型只算 50%，小模型只算 20%。
+- 已知清单的结论也随档位放宽：前沿"建议删除" → 中档"可以考虑" → 小模型"建议保留"。规则里可以用 `by_tier` 单独指定。
+- 删除会让所有工具都失去这个 skill，所以**整体结论按能看到它的最弱模型**来定；每个工具自己的结论显示在安装位置旁边，只想让某个工具不用时用"卸载"。
+- 没设置档位的工具按前沿模型算。设置保存在 `~/.skillmolt/config.json`。
 
 社区维护的[已知过时清单](skillmolt/data/known.json)优先于自动规则。比如 superpowers 系列、`karpathy-guidelines`、`full-output-enforcement`。
 
@@ -136,6 +147,7 @@ There is nothing to install: the tool uses only the Python standard library and 
 - **Drag index with reasons**: every point added or removed is explained. See the table above.
 - **Packages**: skills installed together (for example lark-* or superpowers) are grouped, and a whole package can be uninstalled or deleted as one undoable action. Packages are detected from installer lock files, plugin manifests, git repositories, the known list, a shared folder, and finally shared name prefixes (marked as a guess).
 - **Uninstall** removes one agent's symlink. **Delete** moves the folder to the Trash and removes every link to it.
+- **Model-aware scoring**: label each agent with the model it runs and its tier (frontier, mid-range, small). Points for things strong models already do count 50% for mid-range and 20% for small models, and known-list verdicts relax the same way. The overall verdict follows the weakest model that can see a skill.
 - **Everything is undoable** from the History panel.
 - **Finds broken symlinks.**
 - **Safe by design**: the server listens on localhost only, uses a per-run token and Host checks, acts only on scanned skills and never deletes permanently.

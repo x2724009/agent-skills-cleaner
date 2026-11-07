@@ -17,6 +17,7 @@
         "<li><b>强制指令多</b>（大量“必须/永远/每次”）、<b>要求先调用别的技能</b>、<b>规定冗长流程</b>、<b>说明过长</b>、<b>触发范围过宽</b>、<b>长期未更新</b>，各自加分。</li>" +
         "<li><b>带脚本或工具</b>、<b>教模型用具体的命令行接口</b>、<b>附带参考资料</b>会减分——这些是模型凭空做不到的。</li>" +
         "<li><b>已知过时清单</b>（社区维护的 known.json）优先于自动规则。</li>" +
+        "<li><b>按档位</b>：在“设置模型”里给工具标上档位后，“模型自己会的”那几项加分，中档模型只算 50%，小模型只算 20%；整体结论按能看到它的最弱模型来定。</li>" +
         "<li>≥60 建议删除，35–59 可以考虑，&lt;35 保留。分数只是参考，最终由你决定。</li>" +
         "</ul>" +
         "<p class='muted'>“卸载”只解除某个工具与技能的链接，原文件不动；“删除”把技能文件夹移到废纸篓并解除所有链接。两者都能在操作记录里一键撤销。</p>",
@@ -34,6 +35,9 @@
       save: "保存",
       saved: "模型设置已保存",
       noModel: "未设置模型",
+      judgedAs: (tier) => "按" + tier + "评判",
+      judgedWhy: "删除会让所有工具都失去它，所以整体结论按能看到它的最弱模型来定；卸载时看每个工具自己的结论。",
+      judgedForAgent: (a, tier) => "当前按 " + a + " 的" + tier + "显示",
       total: "全部技能",
       remove: "建议删除",
       consider: "可以考虑",
@@ -122,6 +126,7 @@
         "<li>Points are added for <b>lots of hard rules</b> (MUST/ALWAYS/every time), <b>chaining other skills</b>, <b>prescribed ceremony</b>, <b>very long instructions</b>, <b>broad triggers</b> and <b>staleness</b>.</li>" +
         "<li>Points are removed for <b>bundled scripts or tools</b>, <b>teaching a specific CLI</b> and <b>reference material</b> - things a model cannot do from scratch.</li>" +
         "<li>The community-maintained <b>known list</b> (known.json) wins over heuristics.</li>" +
+        "<li><b>By tier</b>: once you set each agent's tier under Set models, points for what strong models already do count 50% for mid-range and 20% for small models. The overall verdict follows the weakest model that can see the skill.</li>" +
         "<li>≥60 remove, 35–59 consider, &lt;35 keep. The score is advice; you decide.</li>" +
         "</ul>" +
         "<p class='muted'>Uninstall removes one agent's link and leaves the files alone. Delete moves the skill folder to the Trash and removes every link. Both can be undone from History.</p>",
@@ -139,6 +144,9 @@
       save: "Save",
       saved: "Models saved",
       noModel: "No model set",
+      judgedAs: (tier) => "Judged for a " + tier + " model",
+      judgedWhy: "Deleting removes it from every agent, so the overall verdict follows the weakest model that can see it. For uninstalling, check each agent's own verdict.",
+      judgedForAgent: (a, tier) => "Showing " + a + "'s " + tier + " verdict",
       total: "All skills",
       remove: "Remove",
       consider: "Consider",
@@ -293,13 +301,20 @@
     const q = $("#q").value.trim().toLowerCase();
     const agent = agentFilter;
     return report.skills.filter((s) => {
-      if (filter !== "all" && filter !== "broken" && s.verdict !== filter) return false;
+      if (filter !== "all" && filter !== "broken" && eff(s).verdict !== filter) return false;
       if (filter === "broken") return false;
       if (agent && !s.installs.some((i) => i.agent === agent)) return false;
       if (q && !(s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))) return false;
       return true;
     });
   }
+
+  // The tier a skill is shown for: the filtered agent's tier, else the weakest that can see it.
+  function eff(s) {
+    const tier = (agentFilter && s.agent_tiers[agentFilter]) || s.tier;
+    return Object.assign({ tier }, s.tiers[tier]);
+  }
+  const tierName = (tier) => t("tier_" + tier);
 
   const open = new Set();
   const openPkgs = new Set();
@@ -308,8 +323,10 @@
   const pkgById = (id) => (report.packages || []).find((p) => p.id === id);
 
   function renderSummary() {
-    const c = report.counts;
-    const n = report.skills.length;
+    const pool = agentFilter ? report.skills.filter((s) => s.installs.some((i) => i.agent === agentFilter)) : report.skills;
+    const c = { remove: 0, consider: 0, keep: 0 };
+    pool.forEach((s) => { c[eff(s).verdict] += 1; });
+    const n = pool.length;
     $("#ov-line").innerHTML = t("overview", c.remove, n);
     $("#dist").innerHTML = ["remove", "consider", "keep"].filter((k) => c[k])
       .map((k) => "<span class='" + k + "' style='flex-grow:" + c[k] + "' title='" + esc(t(k) + " " + c[k]) + "'></span>").join("");
@@ -328,6 +345,7 @@
 
   function renderRow(s) {
     const isOpen = open.has(s.id);
+    const e = eff(s);
     const agentsList = [...new Set(s.installs.map((i) => i.agent))];
     const where = agentsList.map((a) => "<span class='atag" + (a === agentFilter ? " on" : "") + "' title='" + esc(agentTitle(a)) + "'>" + esc(a) +
       (modelOf(a) ? "<i>" + esc(modelOf(a)) + "</i>" : "") + "</span>").join("");
@@ -335,7 +353,7 @@
 
     let detail = "";
     if (isOpen) {
-      const reasons = s.reasons.map((r) => {
+      const reasons = s.reasons.concat(e.adjust ? [e.adjust] : []).map((r) => {
         const pts = r.id === "known" ? "★" : r.points > 0 ? "+" + r.points : r.points < 0 ? String(r.points) : "·";
         return "<li class='" + r.kind + "'><span class='pts'>" + pts + "</span><span class='" + (r.id === "known" ? "known-reason" : "") + "'>" + esc(r[lang]) + "</span></li>";
       }).join("");
@@ -344,13 +362,17 @@
         const btn = isLink && !CFG.readonly
           ? "<button class='small' data-uninstall='" + esc(s.id) + "' data-path='" + esc(i.path) + "' aria-label='" + esc(t("uninstall") + " · " + i.agent) + "'>" + esc(t("uninstall")) + "</button>"
           : "";
+        const at = s.agent_tiers[i.agent];
+        const av = s.tiers[at];
         return "<div class='inst' title='" + esc(home(i.path)) + "'><span class='agent'>" + esc(i.agent) + "</span>" +
-          "<span class='kind'>" + esc(isLink ? t("link") : t("folder")) + "</span>" + btn + "</div>";
+          "<span class='kind'>" + esc((modelOf(i.agent) || tierName(at)) + " · " + (isLink ? t("link") : t("folder"))) + "</span>" +
+          "<span class='pill " + av.verdict + "' title='" + esc(tierName(at)) + "'>" + av.score + " " + esc(t(av.verdict)) + "</span>" + btn + "</div>";
       }).join("");
       detail =
         "<div class='row-detail'>" +
         "<div class='full'><div class='label'>" + esc(t("description")) + "</div><p class='fulldesc'>" + esc(s.description || "—") + "</p></div>" +
-        "<div><div class='label'>" + esc(t("reasons")) + "</div><ul class='reasons'>" + reasons + "</ul></div>" +
+        "<div><div class='label'>" + esc(t("reasons")) + " · " + esc(t("judgedAs", tierName(e.tier))) + "</div><ul class='reasons'>" + reasons + "</ul>" +
+        "<p class='meta'>" + esc(agentFilter && s.agent_tiers[agentFilter] ? t("judgedForAgent", agentFilter, tierName(e.tier)) : t("judgedWhy")) + "</p></div>" +
         "<div><div class='label'>" + esc(t("installedIn")) + "</div><div class='installs'>" + installs + "</div>" +
         "<p class='meta mono'>" + esc(home(s.real_path)) + " · " + s.skill_md_lines + " " + esc(t("lines")) + " · " + size(s.stats.bytes) + "</p></div>" +
         "<div class='full detail-foot'>" +
@@ -360,7 +382,7 @@
     }
 
     return (
-      "<article class='row " + s.verdict + (isOpen ? " open" : "") + "' data-id='" + esc(s.id) + "'>" +
+      "<article class='row " + e.verdict + (isOpen ? " open" : "") + "' data-id='" + esc(s.id) + "'>" +
       "<div class='row-main' data-toggle='" + esc(s.id) + "' role='button' tabindex='0' aria-expanded='" + isOpen + "' aria-label='" + esc(s.name + " · " + t("expand")) + "'>" +
       (CFG.readonly ? "" : "<label class='check'><input type='checkbox' data-select='" + esc(s.id) + "'" + checked + " aria-label='" + esc(t("select") + " " + s.name) + "'></label>") +
       "<div class='who'><h3 class='name'><span class='nm'>" + esc(s.name) + "</span>" +
@@ -368,8 +390,8 @@
       (s.package && view === "verdict" ? "<span class='tag pkg-tag'>" + esc(pkgById(s.package).name) + "</span>" : "") + "</h3>" +
       "<p class='desc'>" + esc(s.description || "—") + "</p></div>" +
       "<div class='where'>" + where + "</div>" +
-      "<div class='gauge' title='" + esc(t("score")) + " " + s.score + "/100'><span class='num'>" + s.score + "</span><span class='track'><i style='width:" + s.score + "%'></i></span></div>" +
-      "<span class='pill " + s.verdict + "'>" + esc(t(s.verdict)) + "</span>" +
+      "<div class='gauge' title='" + esc(t("score") + " " + e.score + "/100 · " + tierName(e.tier)) + "'><span class='num'>" + e.score + "</span><span class='track'><i style='width:" + e.score + "%'></i></span></div>" +
+      "<span class='pill " + e.verdict + "'>" + esc(t(e.verdict)) + "</span>" +
       "<span class='chev' aria-hidden='true'></span>" +
       "</div>" + detail + "</article>"
     );
@@ -386,7 +408,7 @@
     const hints = { remove: t("hintRemove"), consider: t("hintConsider"), keep: t("hintKeep") };
     let html = "";
     ["remove", "consider", "keep"].forEach((v) => {
-      const group = skills.filter((s) => s.verdict === v);
+      const group = skills.filter((s) => eff(s).verdict === v).sort((a, b) => eff(b).score - eff(a).score);
       if (!group.length) return;
       html += "<section class='group'><h2 class='group-title'><span class='dot " + v + "'></span>" + esc(t(v)) +
         " <span class='count'>" + group.length + "</span><span class='hint'>" + esc(hints[v]) + "</span></h2>" +
@@ -604,8 +626,7 @@
       } catch (e) {
         toast(t("error") + e.message);
       }
-      renderAgents();
-      renderList();
+      await load();
     };
     dlg.showModal();
   }
@@ -677,7 +698,7 @@
     else if (d.toggle) toggleRow(d.toggle);
     else if (d.editModels !== undefined) openModels();
     else if (d.closeModels !== undefined) $("#models").close();
-    else if (d.agentFilter !== undefined) { agentFilter = d.agentFilter; renderAgents(); renderList(); }
+    else if (d.agentFilter !== undefined) { agentFilter = d.agentFilter; renderAgents(); renderSummary(); renderList(); }
     else if (d.pkgToggle) togglePkg(d.pkgToggle);
     else if (d.pkgDelete) doDeletePackage(d.pkgDelete);
     else if (d.pkgUninstall) doUninstallPackage(d.pkgUninstall, d.agent);

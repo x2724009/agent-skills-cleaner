@@ -86,6 +86,20 @@ class SkillTest(unittest.TestCase):
         self.assertEqual(tool["verdict"], "keep")
         self.assertIn("teaches_cli", [r["id"] for r in tool["reasons"]])
 
+    def test_weaker_tier_relaxes_prompt_skill(self):
+        r = analyze(scan(self.roots), known=[], agent_tiers={"Agent": "small"})
+        s = next(x for x in r["skills"] if x["name"] == "be-careful")
+        self.assertEqual(s["tiers"]["frontier"]["verdict"], "remove")
+        self.assertLess(s["tiers"]["small"]["score"], s["tiers"]["frontier"]["score"])
+        self.assertEqual(s["tier"], "small")  # weakest agent that can see it decides
+        self.assertEqual(s["verdict"], s["tiers"]["small"]["verdict"])
+        self.assertEqual(s["tiers"]["small"]["adjust"]["id"], "tier_adjust")
+
+    def test_known_remove_relaxes_by_tier(self):
+        known = [{"names": ["web-clean"], "verdict": "remove", "reason": {"zh": "x", "en": "x"}}]
+        s = next(x for x in analyze(scan(self.roots), known=known)["skills"] if x["name"] == "web-clean")
+        self.assertEqual([s["tiers"][t]["verdict"] for t in ("frontier", "mid", "small")], ["remove", "consider", "keep"])
+
     def test_known_rule_wins(self):
         known = [{"names": ["web-clean"], "verdict": "remove", "reason": {"zh": "x", "en": "x"}}]
         s = next(s for s in analyze(scan(self.roots), known=known)["skills"] if s["name"] == "web-clean")

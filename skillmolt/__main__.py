@@ -4,6 +4,7 @@ import os
 import sys
 
 from . import __version__
+from . import config
 from .analyzer import analyze
 from .scanner import scan
 
@@ -22,7 +23,8 @@ def parse_roots(values):
 
 
 def report(as_json, roots=None):
-    result = analyze(scan(roots))
+    tiers = {k: v.get("tier") for k, v in config.load_config()["agents"].items()}
+    result = analyze(scan(roots), agent_tiers=tiers)
     if as_json:
         json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
         print()

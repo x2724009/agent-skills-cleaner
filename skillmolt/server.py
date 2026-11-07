@@ -32,7 +32,8 @@ class State:
 
     def rescan(self):
         with self.lock:
-            self.report = analyze(scan(self.roots))
+            tiers = {k: v.get("tier") for k, v in config.load_config()["agents"].items()}
+            self.report = analyze(scan(self.roots), agent_tiers=tiers)
             return self.report
 
     def find_skill(self, skill_id):

@@ -77,6 +77,25 @@ def _cli_commands(body):
     return [c for c in sorted(found, key=lambda c: -found[c]) if found[c] >= 3]
 
 
+# Tiers, strongest first. A skill's overall verdict follows the weakest
+# model that can see it, since deleting it takes it from every agent.
+TIERS = ("frontier", "mid", "small")
+TIER_WEIGHT = {"frontier": 1.0, "mid": 0.5, "small": 0.2}
+TIER_NAMES = {
+    "frontier": {"zh": "前沿模型", "en": "frontier"},
+    "mid": {"zh": "中档模型", "en": "mid-range"},
+    "small": {"zh": "小模型", "en": "small"},
+}
+# Points that reflect "the model already knows how to do this".
+CAPABILITY_REASONS = {"pure_prompt", "overrides", "chains_skills", "process_heavy", "generic_advice"}
+# How a known-list verdict (written for frontier models) relaxes for weaker ones.
+KNOWN_BY_TIER = {
+    "remove": {"frontier": "remove", "mid": "consider", "small": "keep"},
+    "consider": {"frontier": "consider", "mid": "keep", "small": "keep"},
+    "keep": {"frontier": "keep", "mid": "keep", "small": "keep"},
+}
+
+
 def load_known(path=KNOWN_PATH):
     try:
         with open(path, encoding="utf-8") as f:
@@ -184,41 +203,78 @@ def analyze_skill(skill, known=None, now=None):
             "由安装器管理（%s），删除后可能在更新时被装回" % (skill["managed"].get("source") or "lock file"),
             "Managed by an installer (%s); it may come back on update" % (skill["managed"].get("source") or "lock file")))
 
-    score = sum(r["points"] for r in reasons)
+    base = sum(r["points"] for r in reasons)
+    capability = sum(r["points"] for r in reasons if r["id"] in CAPABILITY_REASONS)
     rule = _match_known(skill, known)
     if rule:
         reasons.insert(0, _reason("known", rule.get("verdict", "consider") == "keep" and "good" or "bad", 0,
                                   rule["reason"]["zh"], rule["reason"]["en"]))
-        if rule.get("verdict") == "remove":
-            score = max(score, 75)
-        elif rule.get("verdict") == "consider":
-            score = max(score, CONSIDER_AT + 5)
-        elif rule.get("verdict") == "keep":
-            score = min(score, 15)
 
-    score = max(0, min(100, score))
-    if score >= REMOVE_AT:
-        verdict = "remove"
-    elif score >= CONSIDER_AT:
-        verdict = "consider"
-    else:
-        verdict = "keep"
-
+    tiers = {t: _score_for_tier(base, capability, rule, t) for t in TIERS}
+    top = tiers["frontier"]
     return {
-        "score": score,
-        "verdict": verdict,
+        "score": top["score"],
+        "verdict": top["verdict"],
         "reasons": reasons,
+        "tiers": tiers,
         "known": bool(rule),
         "group": rule.get("group") if rule else None,
     }
 
 
-def analyze(scan_result, known=None):
+def _verdict(score):
+    if score >= REMOVE_AT:
+        return "remove"
+    if score >= CONSIDER_AT:
+        return "consider"
+    return "keep"
+
+
+def _score_for_tier(base, capability, rule, tier):
+    """Score a skill for one model tier.
+
+    Weaker models still benefit from being told how to plan, verify and
+    follow a process, so the capability-related points count for less.
+    """
+    keep_share = TIER_WEIGHT[tier]
+    adjust = -int(round(capability * (1 - keep_share))) if capability > 0 else 0
+    score = base + adjust
+    known_verdict = None
+    if rule:
+        known_verdict = (rule.get("by_tier") or {}).get(tier) or KNOWN_BY_TIER.get(rule.get("verdict", "consider"), {}).get(tier)
+        if known_verdict == "remove":
+            score = max(score, 75)
+        elif known_verdict == "consider":
+            score = min(max(score, CONSIDER_AT + 5), REMOVE_AT - 1)
+        elif known_verdict == "keep":
+            score = min(score, 15)
+    score = max(0, min(100, score))
+    note = None
+    if tier != "frontier" and (adjust or (rule and known_verdict != rule.get("verdict"))):
+        pct = int(round(keep_share * 100))
+        note = _reason("tier_adjust", "good", adjust,
+            "按%s评判：提示词、流程、强制指令这些“模型自己会的”部分只算 %d%%%s" % (
+                TIER_NAMES[tier]["zh"], pct, "；已知清单的结论也相应放宽" if rule else ""),
+            "Judged for a %s model: points for what strong models already do (prompting, process, hard rules) count %d%%%s" % (
+                TIER_NAMES[tier]["en"], pct, "; the known-list verdict is relaxed too" if rule else ""))
+    return {"score": score, "verdict": _verdict(score), "adjust": note}
+
+
+def analyze(scan_result, known=None, agent_tiers=None):
+    """agent_tiers maps an agent name to "frontier", "mid" or "small".
+    Agents without a tier are treated as frontier."""
     known = known if known is not None else load_known()
+    agent_tiers = agent_tiers or {}
     out = []
     for skill in scan_result["skills"]:
         item = {k: v for k, v in skill.items() if k != "body"}
         item.update(analyze_skill(skill, known))
+        seen = {i["agent"]: (agent_tiers.get(i["agent"]) or "frontier") for i in item["installs"]}
+        item["agent_tiers"] = seen
+        weakest = max((TIERS.index(t) for t in seen.values()), default=0)
+        item["tier"] = TIERS[weakest]
+        item["score"] = item["tiers"][item["tier"]]["score"]
+        item["verdict"] = item["tiers"][item["tier"]]["verdict"]
         out.append(item)
     order = {"remove": 0, "consider": 1, "keep": 2}
     out.sort(key=lambda s: (order[s["verdict"]], -s["score"], s["name"].lower()))
