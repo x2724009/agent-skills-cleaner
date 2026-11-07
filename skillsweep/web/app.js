@@ -31,6 +31,13 @@
       hintConsider: "价值有限，看你用不用",
       hintKeep: "带工具或模型不知道的知识",
       score: "拖累指数",
+      overview: (r, n) => "<b>" + r + "</b>个建议删除<span class='of'>· 共 " + n + " 个技能</span>",
+      all: "全部",
+      reasons: "评分理由",
+      installedIn: "安装位置",
+      description: "介绍",
+      moreAgents: (n) => " 等 " + n + " 个",
+      expand: "展开详情",
       known: "已知过时",
       link: "链接",
       folder: "本体",
@@ -93,6 +100,13 @@
       hintConsider: "Limited value, your call",
       hintKeep: "Ships tools or knowledge models lack",
       score: "Drag",
+      overview: (r, n) => "<b>" + r + "</b>to remove<span class='of'>· " + n + " skills scanned</span>",
+      all: "All",
+      reasons: "Why this score",
+      installedIn: "Installed in",
+      description: "About",
+      moreAgents: (n) => " +" + (n - 1),
+      expand: "Show details",
       known: "Known stale",
       link: "link",
       folder: "folder",
@@ -210,63 +224,77 @@
     });
   }
 
+  const open = new Set();
+
   function renderSummary() {
     const c = report.counts;
+    const n = report.skills.length;
+    $("#ov-line").innerHTML = t("overview", c.remove, n);
+    $("#dist").innerHTML = ["remove", "consider", "keep"].filter((k) => c[k])
+      .map((k) => "<span class='" + k + "' style='flex-grow:" + c[k] + "' title='" + esc(t(k) + " " + c[k]) + "'></span>").join("");
     const items = [
-      ["all", report.skills.length, t("total")],
+      ["all", n, t("all")],
       ["remove", c.remove, t("remove")],
       ["consider", c.consider, t("consider")],
       ["keep", c.keep, t("keep")],
-      ["broken", report.broken.length, t("broken")],
     ];
-    $("#summary").innerHTML = items.map(([k, n, l]) =>
-      "<button class='stat " + k + "' data-filter='" + k + "' aria-pressed='" + (filter === k) + "' aria-label='" + esc(l + " " + n) + "'>" +
-      "<span class='n'>" + n + "</span><span class='l'>" + esc(l) + "</span></button>").join("");
+    if (report.broken.length) items.push(["broken", report.broken.length, t("broken")]);
+    $("#summary").innerHTML = items.map(([k, num, l]) =>
+      "<button data-filter='" + k + "' aria-pressed='" + (filter === k) + "'>" +
+      (k === "all" ? "" : "<span class='dot " + k + "'></span>") +
+      "<span>" + esc(l) + "</span><span class='n'>" + num + "</span></button>").join("");
   }
 
-  function meterColor(v) {
-    return v === "remove" ? "var(--remove)" : v === "consider" ? "var(--consider)" : "var(--keep)";
-  }
-
-  function renderCard(s) {
-    const reasons = s.reasons.map((r) => {
-      const pts = r.id === "known" ? "★" : r.points > 0 ? "+" + r.points : r.points < 0 ? String(r.points) : "·";
-      return "<li class='" + r.kind + "'><span class='pts'>" + pts + "</span><span class='" + (r.id === "known" ? "known-reason" : "") + "'>" + esc(r[lang]) + "</span></li>";
-    }).join("");
-
-    const installs = s.installs.map((i) => {
-      const isLink = i.kind === "link";
-      const btn = isLink && !CFG.readonly
-        ? "<button class='small' data-uninstall='" + esc(s.id) + "' data-path='" + esc(i.path) + "' aria-label='" + esc(t("uninstall") + " · " + i.agent) + "'>" + esc(t("uninstall")) + "</button>"
-        : "";
-      return "<span class='chip " + (isLink ? "link" : "folder") + "' title='" + esc(home(i.path)) + "'>" + esc(i.agent) +
-        " <span class='kind'>" + esc(isLink ? t("link") : t("folder")) + "</span>" + btn + "</span>";
-    }).join("");
-
+  function renderRow(s) {
+    const isOpen = open.has(s.id);
+    const agentsList = [...new Set(s.installs.map((i) => i.agent))];
+    const where = agentsList.length > 1 ? agentsList[0] + t("moreAgents", agentsList.length) : agentsList[0] || "";
     const checked = selected.has(s.id) ? " checked" : "";
+
+    let detail = "";
+    if (isOpen) {
+      const reasons = s.reasons.map((r) => {
+        const pts = r.id === "known" ? "★" : r.points > 0 ? "+" + r.points : r.points < 0 ? String(r.points) : "·";
+        return "<li class='" + r.kind + "'><span class='pts'>" + pts + "</span><span class='" + (r.id === "known" ? "known-reason" : "") + "'>" + esc(r[lang]) + "</span></li>";
+      }).join("");
+      const installs = s.installs.map((i) => {
+        const isLink = i.kind === "link";
+        const btn = isLink && !CFG.readonly
+          ? "<button class='small' data-uninstall='" + esc(s.id) + "' data-path='" + esc(i.path) + "' aria-label='" + esc(t("uninstall") + " · " + i.agent) + "'>" + esc(t("uninstall")) + "</button>"
+          : "";
+        return "<div class='inst' title='" + esc(home(i.path)) + "'><span class='agent'>" + esc(i.agent) + "</span>" +
+          "<span class='kind'>" + esc(isLink ? t("link") : t("folder")) + "</span>" + btn + "</div>";
+      }).join("");
+      detail =
+        "<div class='row-detail'>" +
+        "<div class='full'><div class='label'>" + esc(t("description")) + "</div><p class='fulldesc'>" + esc(s.description || "—") + "</p></div>" +
+        "<div><div class='label'>" + esc(t("reasons")) + "</div><ul class='reasons'>" + reasons + "</ul></div>" +
+        "<div><div class='label'>" + esc(t("installedIn")) + "</div><div class='installs'>" + installs + "</div>" +
+        "<p class='meta mono'>" + esc(home(s.real_path)) + " · " + s.skill_md_lines + " " + esc(t("lines")) + " · " + size(s.stats.bytes) + "</p></div>" +
+        "<div class='full detail-foot'>" +
+        "<button class='small ghost' data-reveal='" + esc(s.id) + "'>" + esc(t("reveal")) + "</button>" +
+        (CFG.readonly ? "" : "<button class='small danger' data-delete='" + esc(s.id) + "'>" + esc(t("delete")) + "</button>") +
+        "</div></div>";
+    }
+
     return (
-      "<article class='card " + s.verdict + "' data-id='" + esc(s.id) + "'>" +
-      "<div class='card-head'>" +
-      "<h3>" + esc(s.name) + "</h3>" +
-      "<span class='badge " + s.verdict + "'>" + esc(t(s.verdict)) + "</span>" +
-      (s.known ? "<span class='badge known'>" + esc(t("known")) + (s.group ? " · " + esc(s.group) : "") + "</span>" : "") +
-      "<span class='meter'>" + esc(t("score")) + " <b>" + s.score + "</b><span class='meter-bar'><span style='width:" + s.score + "%;background:" + meterColor(s.verdict) + "'></span></span></span>" +
-      "</div>" +
-      "<p class='desc' data-toggle='" + esc(s.id) + "' title='" + esc(s.description) + "'>" + esc(s.description || "—") + "</p>" +
-      "<ul class='reasons'>" + reasons + "</ul>" +
-      "<div class='installs'>" + installs + "</div>" +
-      "<div class='card-foot'>" +
-      "<span class='path mono'>" + esc(home(s.real_path)) + " · " + s.skill_md_lines + " " + esc(t("lines")) + " · " + size(s.stats.bytes) + "</span>" +
-      "<span class='acts'>" +
-      (CFG.readonly ? "" : "<label class='select-box'><input type='checkbox' data-select='" + esc(s.id) + "'" + checked + ">" + esc(t("select")) + "</label>") +
-      "<button class='small ghost' data-reveal='" + esc(s.id) + "'>" + esc(t("reveal")) + "</button>" +
-      (CFG.readonly ? "" : "<button class='small danger' data-delete='" + esc(s.id) + "'>" + esc(t("delete")) + "</button>") +
-      "</span></div></article>"
+      "<article class='row " + s.verdict + (isOpen ? " open" : "") + "' data-id='" + esc(s.id) + "'>" +
+      "<div class='row-main' data-toggle='" + esc(s.id) + "' role='button' tabindex='0' aria-expanded='" + isOpen + "' aria-label='" + esc(s.name + " · " + t("expand")) + "'>" +
+      (CFG.readonly ? "" : "<label class='check'><input type='checkbox' data-select='" + esc(s.id) + "'" + checked + " aria-label='" + esc(t("select") + " " + s.name) + "'></label>") +
+      "<div class='who'><h3 class='name'><span class='nm'>" + esc(s.name) + "</span>" +
+      (s.known ? "<span class='tag'>" + esc(t("known")) + "</span>" : "") + "</h3>" +
+      "<p class='desc'>" + esc(s.description || "—") + "</p></div>" +
+      "<div class='where'>" + esc(where) + "</div>" +
+      "<div class='gauge' title='" + esc(t("score")) + " " + s.score + "/100'><span class='num'>" + s.score + "</span><span class='track'><i style='width:" + s.score + "%'></i></span></div>" +
+      "<span class='pill " + s.verdict + "'>" + esc(t(s.verdict)) + "</span>" +
+      "<span class='chev' aria-hidden='true'></span>" +
+      "</div>" + detail + "</article>"
     );
   }
 
   function renderList() {
     const list = $("#list");
+    document.body.classList.toggle("readonly", !!CFG.readonly);
     if (filter === "broken") { list.innerHTML = ""; renderBroken(true); return; }
     const skills = visibleSkills();
     if (!skills.length) { list.innerHTML = "<p class='empty'>" + esc(t("emptyList")) + "</p>"; renderBroken(false); return; }
@@ -275,8 +303,9 @@
     ["remove", "consider", "keep"].forEach((v) => {
       const group = skills.filter((s) => s.verdict === v);
       if (!group.length) return;
-      html += "<h2 class='group-title'>" + esc(t(v)) + " <span class='count'>" + group.length + "</span><span class='hint'>" + esc(hints[v]) + "</span></h2>";
-      html += group.map(renderCard).join("");
+      html += "<section class='group'><h2 class='group-title'><span class='dot " + v + "'></span>" + esc(t(v)) +
+        " <span class='count'>" + group.length + "</span><span class='hint'>" + esc(hints[v]) + "</span></h2>" +
+        "<div class='rows'>" + group.map(renderRow).join("") + "</div></section>";
     });
     list.innerHTML = html;
     renderBroken(filter === "all");
@@ -286,12 +315,12 @@
     const el = $("#broken");
     if (!show || !report.broken.length) { el.innerHTML = ""; return; }
     el.innerHTML =
-      "<h2 class='group-title'>" + esc(t("brokenTitle")) + " <span class='count'>" + report.broken.length + "</span><span class='hint'>" + esc(t("brokenHint")) + "</span></h2>" +
+      "<section class='group'><h2 class='group-title'><span class='dot broken'></span>" + esc(t("brokenTitle")) + " <span class='count'>" + report.broken.length + "</span><span class='hint'>" + esc(t("brokenHint")) + "</span></h2><div class='rows'>" +
       report.broken.map((b) =>
-        "<article class='card remove'><div class='card-head'><h3>" + esc(b.name) + "</h3><span class='badge known'>" + esc(b.agent) + "</span></div>" +
-        "<div class='card-foot'><span class='path mono'>" + esc(home(b.path)) + " → " + esc(b.target) + "</span>" +
-        (CFG.readonly ? "" : "<span class='acts'><button class='small danger' data-broken='" + esc(b.id) + "'>" + esc(t("removeLink")) + "</button></span>") +
-        "</div></article>").join("");
+        "<article class='row broken-row'><div class='who'><h3 class='name'><span class='nm'>" + esc(b.name) + "</span><span class='tag'>" + esc(b.agent) + "</span></h3>" +
+        "<p class='desc mono'>" + esc(home(b.path)) + " → " + esc(b.target) + "</p></div>" +
+        (CFG.readonly ? "" : "<button class='small danger' data-broken='" + esc(b.id) + "'>" + esc(t("removeLink")) + "</button>") +
+        "</article>").join("") + "</div></section>";
   }
 
   function renderBulk() {
@@ -349,7 +378,7 @@
     if (!skills.length) return;
     const title = skills.length === 1 ? t("confirmDeleteTitle", skills[0].name) : t("confirmBulkTitle", skills.length);
     const body = "<p>" + esc(t("confirmDeleteBody")) + "</p>" +
-      skills.map((s) => (skills.length > 1 ? "<h3 style='font-size:14px;margin-top:10px'>" + esc(s.name) + "</h3>" : "") + deletePlan(s)).join("");
+      skills.map((s) => (skills.length > 1 ? "<h3>" + esc(s.name) + "</h3>" : "") + deletePlan(s)).join("");
     if (!(await confirmDialog(title, body, t("doDelete")))) return;
     let last = null;
     for (const s of skills) {
@@ -405,7 +434,21 @@
     }).join("");
   }
 
+  function toggleRow(id) {
+    if (open.has(id)) open.delete(id); else open.add(id);
+    renderList();
+    const row = document.querySelector(".row[data-id='" + CSS.escape(id) + "'] .row-main");
+    if (row) row.focus({ preventScroll: true });
+  }
+
+  document.addEventListener("keydown", (ev) => {
+    const el = ev.target.closest && ev.target.closest("[data-toggle]");
+    if (el && ev.target === el && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); toggleRow(el.dataset.toggle); }
+    if (ev.key === "Escape" && !$("#drawer").hidden) closeDrawer();
+  });
+
   document.addEventListener("click", (ev) => {
+    if (ev.target.closest(".check")) return;
     const el = ev.target.closest("button, [data-toggle]");
     if (!el) return;
     const d = el.dataset;
@@ -420,7 +463,7 @@
     }
     else if (d.restore) doRestore(d.restore);
     else if (d.undo) { $("#toast").hidden = true; doRestore(d.undo); }
-    else if (d.toggle) el.closest(".card").classList.toggle("open");
+    else if (d.toggle) toggleRow(d.toggle);
   });
 
   document.addEventListener("change", (ev) => {
@@ -440,8 +483,10 @@
     render();
     if (!$("#drawer").hidden) loadHistory();
   });
-  $("#btn-history").addEventListener("click", () => { $("#drawer").hidden = false; loadHistory(); });
-  $("#btn-close-drawer").addEventListener("click", () => { $("#drawer").hidden = true; });
+  function closeDrawer() { $("#drawer").hidden = true; $("#scrim").hidden = true; }
+  $("#btn-history").addEventListener("click", () => { $("#drawer").hidden = false; $("#scrim").hidden = false; loadHistory(); });
+  $("#btn-close-drawer").addEventListener("click", closeDrawer);
+  $("#scrim").addEventListener("click", closeDrawer);
 
   render();
   load();

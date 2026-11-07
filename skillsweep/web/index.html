@@ -10,6 +10,7 @@
 </head>
 <body>
 <header class="top">
+  <div class="wrap">
   <div class="brand">
     <img src="/icon.svg" alt="" width="28" height="28">
     <div>
@@ -22,28 +23,33 @@
     <button class="ghost" id="btn-lang">EN</button>
     <button class="primary" id="btn-rescan" data-i18n="rescan"></button>
   </div>
+  </div>
 </header>
 
-<div class="banner" id="readonly-banner" hidden data-i18n="readonlyBanner"></div>
+<div class="banner" id="readonly-banner" hidden><div class="wrap"><div data-i18n="readonlyBanner"></div></div></div>
 
-<main>
-  <section class="summary" id="summary"></section>
-
-  <details class="how">
-    <summary data-i18n="howTitle"></summary>
-    <div data-i18n-html="howBody"></div>
-  </details>
+<main class="wrap">
+  <section class="overview">
+    <p class="ov-line" id="ov-line"></p>
+    <div class="dist" id="dist" aria-hidden="true"></div>
+    <div class="legend" id="summary"></div>
+    <details class="how">
+      <summary data-i18n="howTitle"></summary>
+      <div class="muted" data-i18n-html="howBody"></div>
+    </details>
+  </section>
 
   <section class="toolbar">
-    <input type="search" id="q" data-i18n-placeholder="search">
-    <select id="agent"></select>
-    <button class="danger" id="btn-bulk" hidden></button>
+    <input type="search" id="q" data-i18n-placeholder="search" aria-label="search">
+    <select id="agent" aria-label="agent"></select>
+    <button class="danger solid" id="btn-bulk" hidden></button>
   </section>
 
   <section id="list" aria-live="polite"></section>
   <section id="broken"></section>
 </main>
 
+<div class="scrim" id="scrim" hidden></div>
 <aside class="drawer" id="drawer" hidden>
   <div class="drawer-head">
     <h2 data-i18n="history"></h2>
@@ -59,7 +65,7 @@
     <div id="confirm-body"></div>
     <div class="dialog-actions">
       <button value="cancel" class="ghost" data-i18n="cancel"></button>
-      <button value="ok" class="danger" id="confirm-ok"></button>
+      <button value="ok" class="danger solid" id="confirm-ok"></button>
     </div>
   </form>
 </dialog>
