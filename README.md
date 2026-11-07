@@ -1,4 +1,4 @@
-<p align="center"><img src="skillmolt/web/icon.svg" width="120" alt="SkillMolt logo: a blue crab stepping out of its old shell"></p>
+<p align="center"><img src="skillmolt/web/icon.svg" width="120" alt="SkillMolt logo: a white crab under the outline of its old shell, on a blue tile"></p>
 
 <h1 align="center">SkillMolt 蜕壳</h1>
 
