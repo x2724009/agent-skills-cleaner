@@ -22,6 +22,7 @@
         "<p class='muted'>“卸载”只解除某个工具与技能的链接，原文件不动；“删除”把技能文件夹移到废纸篓并解除所有链接。两者都能在操作记录里一键撤销。</p>",
       search: "搜索名称或介绍…",
       allAgents: "全部工具",
+      agentsLabel: "所在工具",
       total: "全部技能",
       remove: "建议删除",
       consider: "可以考虑",
@@ -115,6 +116,7 @@
         "<p class='muted'>Uninstall removes one agent's link and leaves the files alone. Delete moves the skill folder to the Trash and removes every link. Both can be undone from History.</p>",
       search: "Search name or description…",
       allAgents: "All agents",
+      agentsLabel: "Agent",
       total: "All skills",
       remove: "Remove",
       consider: "Consider",
@@ -198,6 +200,7 @@
   const t = (k, ...a) => { const v = I18N[lang][k]; return typeof v === "function" ? v(...a) : v; };
 
   let report = null;
+  let agentFilter = "";
   let filter = "all";
   const selected = new Set();
 
@@ -262,7 +265,7 @@
 
   function visibleSkills() {
     const q = $("#q").value.trim().toLowerCase();
-    const agent = $("#agent").value;
+    const agent = agentFilter;
     return report.skills.filter((s) => {
       if (filter !== "all" && filter !== "broken" && s.verdict !== filter) return false;
       if (filter === "broken") return false;
@@ -300,7 +303,7 @@
   function renderRow(s) {
     const isOpen = open.has(s.id);
     const agentsList = [...new Set(s.installs.map((i) => i.agent))];
-    const where = agentsList.length > 1 ? agentsList[0] + t("moreAgents", agentsList.length) : agentsList[0] || "";
+    const where = agentsList.map((a) => "<span class='atag" + (a === agentFilter ? " on" : "") + "'>" + esc(a) + "</span>").join("");
     const checked = selected.has(s.id) ? " checked" : "";
 
     let detail = "";
@@ -337,7 +340,7 @@
       (s.known ? "<span class='tag'>" + esc(t("known")) + "</span>" : "") +
       (s.package && view === "verdict" ? "<span class='tag pkg-tag'>" + esc(pkgById(s.package).name) + "</span>" : "") + "</h3>" +
       "<p class='desc'>" + esc(s.description || "—") + "</p></div>" +
-      "<div class='where'>" + esc(where) + "</div>" +
+      "<div class='where'>" + where + "</div>" +
       "<div class='gauge' title='" + esc(t("score")) + " " + s.score + "/100'><span class='num'>" + s.score + "</span><span class='track'><i style='width:" + s.score + "%'></i></span></div>" +
       "<span class='pill " + s.verdict + "'>" + esc(t(s.verdict)) + "</span>" +
       "<span class='chev' aria-hidden='true'></span>" +
@@ -431,11 +434,14 @@
   }
 
   function renderAgents() {
-    const sel = $("#agent");
-    const cur = sel.value;
-    sel.innerHTML = "<option value=''>" + esc(t("allAgents")) + "</option>" +
-      agents().map((a) => "<option" + (a === cur ? " selected" : "") + ">" + esc(a) + "</option>").join("");
+    const list = agents();
+    if (agentFilter && !list.includes(agentFilter)) agentFilter = "";
+    const count = (a) => report.skills.filter((s) => s.installs.some((i) => i.agent === a)).length;
+    const items = [["", t("allAgents"), report.skills.length]].concat(list.map((a) => [a, a, count(a)]));
+    $("#agents").innerHTML = "<span class='agents-label'>" + esc(t("agentsLabel")) + "</span>" + items.map(([v, label, n]) =>
+      "<button data-agent-filter='" + esc(v) + "' aria-pressed='" + (agentFilter === v) + "'>" + esc(label) + "<span class='n'>" + n + "</span></button>").join("");
   }
+
 
   function render() {
     applyI18n();
@@ -610,6 +616,7 @@
     else if (d.restore) doRestore(d.restore);
     else if (d.undo) { $("#toast").hidden = true; doRestore(d.undo); }
     else if (d.toggle) toggleRow(d.toggle);
+    else if (d.agentFilter !== undefined) { agentFilter = d.agentFilter; renderAgents(); renderList(); }
     else if (d.pkgToggle) togglePkg(d.pkgToggle);
     else if (d.pkgDelete) doDeletePackage(d.pkgDelete);
     else if (d.pkgUninstall) doUninstallPackage(d.pkgUninstall, d.agent);
@@ -628,7 +635,6 @@
   });
 
   $("#q").addEventListener("input", renderList);
-  $("#agent").addEventListener("change", renderList);
   $("#btn-rescan").addEventListener("click", load);
   $("#btn-bulk").addEventListener("click", () => doDelete([...selected]));
   $("#btn-lang").addEventListener("click", () => {

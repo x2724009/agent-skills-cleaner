@@ -41,12 +41,12 @@
 
   <section class="toolbar">
     <input type="search" id="q" data-i18n-placeholder="search" aria-label="search">
-    <select id="agent" aria-label="agent"></select>
     <div class="seg" id="view-seg" role="group">
       <button data-view="verdict" data-i18n="viewVerdict"></button>
       <button data-view="package" data-i18n="viewPackage"></button>
     </div>
     <button class="danger solid" id="btn-bulk" hidden></button>
+    <div class="agents" id="agents" role="group" aria-label="agents"></div>
   </section>
 
   <section id="list" aria-live="polite"></section>

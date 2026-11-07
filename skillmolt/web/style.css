@@ -148,10 +148,10 @@ main { padding-block: 16px 96px; }
 .row + .row { border-top: 1px solid var(--line); }
 .row-main {
   display: grid; align-items: center; gap: 14px; padding: 11px 14px; cursor: pointer;
-  grid-template-columns: auto minmax(0, 1fr) 150px 92px 78px 16px;
+  grid-template-columns: auto minmax(0, 1fr) 190px 92px 78px 16px;
   grid-template-areas: "check who where gauge pill chev";
 }
-.readonly .row-main { grid-template-columns: minmax(0, 1fr) 150px 92px 78px 16px; grid-template-areas: "who where gauge pill chev"; }
+.readonly .row-main { grid-template-columns: minmax(0, 1fr) 190px 92px 78px 16px; grid-template-areas: "who where gauge pill chev"; }
 .row-main:hover { background: color-mix(in srgb, var(--sunken) 55%, transparent); }
 .row.open .row-main { background: var(--sunken); }
 .check { grid-area: check; display: flex; padding: 4px; margin: -4px; cursor: pointer; }
@@ -161,7 +161,10 @@ main { padding-block: 16px 96px; }
 .name .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag { font-family: var(--font-ui); font-size: 11px; font-weight: 500; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
 .desc { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-.where { grid-area: where; color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.where { grid-area: where; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.atag { font-size: 11.5px; line-height: 1.5; padding: 0 7px; border-radius: 5px; background: var(--sunken); color: var(--muted); white-space: nowrap; }
+.row.open .atag { background: var(--surface); }
+.atag.on { background: var(--accent-soft); color: var(--accent); }
 .gauge { grid-area: gauge; display: flex; align-items: center; gap: 8px; }
 .gauge .num { width: 22px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; font-size: 13px; }
 .track { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--sunken); overflow: hidden; }
@@ -254,11 +257,10 @@ dialog ul { padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; max-he
 @media (max-width: 760px) {
   .row-main, .readonly .row-main {
     grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: "check who chev" ". gauge pill";
+    grid-template-areas: "check who chev" ". where where" ". gauge pill";
     row-gap: 8px;
   }
-  .readonly .row-main { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who chev" "gauge pill"; }
-  .where { display: none; }
+  .readonly .row-main { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who chev" "where where" "gauge pill"; }
   .gauge { max-width: 180px; }
   .pill { justify-self: end; }
   .row-detail { grid-template-columns: minmax(0, 1fr); }
@@ -306,3 +308,11 @@ dialog ul { padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; max-he
 }
 .pkg-head > * { grid-area: auto; }
 .brand h1 .cn { font-weight: 500; color: var(--muted); margin-left: 4px; }
+
+/* Agent filter: always-visible buttons */
+.agents { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.agents-label { font-size: 12px; color: var(--faint); margin-right: 2px; }
+.agents button { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px; font-size: 12.5px; border-color: var(--line); }
+.agents button .n { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12px; }
+.agents button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.agents button[aria-pressed="true"] .n { color: var(--accent); }
