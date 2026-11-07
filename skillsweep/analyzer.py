@@ -13,6 +13,8 @@ import os
 import re
 import time
 
+from .packages import group as group_packages
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 KNOWN_PATH = os.path.join(HERE, "data", "known.json")
 
@@ -220,11 +222,13 @@ def analyze(scan_result, known=None):
         out.append(item)
     order = {"remove": 0, "consider": 1, "keep": 2}
     out.sort(key=lambda s: (order[s["verdict"]], -s["score"], s["name"].lower()))
+    packages = group_packages(out, scan_result["roots"])
     counts = {"remove": 0, "consider": 0, "keep": 0}
     for s in out:
         counts[s["verdict"]] += 1
     return {
         "skills": out,
+        "packages": packages,
         "broken": scan_result["broken"],
         "roots": scan_result["roots"],
         "scanned_at": scan_result["scanned_at"],

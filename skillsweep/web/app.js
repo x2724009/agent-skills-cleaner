@@ -38,6 +38,30 @@
       description: "介绍",
       moreAgents: (n) => " 等 " + n + " 个",
       expand: "展开详情",
+      viewVerdict: "按结论",
+      viewPackage: "按技能包",
+      ungrouped: "未归入技能包",
+      ungroupedHint: "单独安装的技能",
+      pkgSkills: (n) => n + " 个技能",
+      pkgCounts: (r, c) => (r ? r + " 个建议删除" : "") + (r && c ? " · " : "") + (c ? c + " 个可以考虑" : ""),
+      pkgAllKeep: "全部建议保留",
+      kind_lock: "安装器记录",
+      kind_plugin: "插件",
+      kind_git: "git 仓库",
+      kind_known: "已知清单",
+      kind_folder: "同一文件夹",
+      kind_prefix: "按名称推测",
+      pkgSource: "来源",
+      pkgDelete: "整包删除",
+      pkgUninstall: (a) => "从 " + a + " 卸载整包",
+      confirmPkgDeleteTitle: (n, k) => "删除技能包 " + n + "（" + k + " 个技能）？",
+      confirmPkgDeleteBody: "包里每个技能的文件夹都会移到废纸篓，并解除所有链接。整包算一次操作，可以在操作记录里一键撤销：",
+      pkgKeepWarn: (n) => "注意：包里有 " + n + " 个技能被评为“建议保留”，也会一起删除。",
+      pkgGuessWarn: "注意：这个包是按名称前缀推测的，请确认这些技能确实属于同一套。",
+      confirmPkgUninstallTitle: (n, a) => "从 " + a + " 卸载技能包 " + n + "？",
+      confirmPkgUninstallBody: "只解除该工具里的这些链接，技能文件和其他工具不受影响：",
+      "act_delete-package": "删除技能包",
+      "act_uninstall-package": "卸载技能包",
       known: "已知过时",
       link: "链接",
       folder: "本体",
@@ -107,6 +131,30 @@
       description: "About",
       moreAgents: (n) => " +" + (n - 1),
       expand: "Show details",
+      viewVerdict: "By verdict",
+      viewPackage: "By package",
+      ungrouped: "Not in a package",
+      ungroupedHint: "Installed on their own",
+      pkgSkills: (n) => n + " skills",
+      pkgCounts: (r, c) => (r ? r + " to remove" : "") + (r && c ? " · " : "") + (c ? c + " to consider" : ""),
+      pkgAllKeep: "All worth keeping",
+      kind_lock: "installer",
+      kind_plugin: "plugin",
+      kind_git: "git repo",
+      kind_known: "known list",
+      kind_folder: "same folder",
+      kind_prefix: "guessed from names",
+      pkgSource: "Source",
+      pkgDelete: "Delete package",
+      pkgUninstall: (a) => "Uninstall from " + a,
+      confirmPkgDeleteTitle: (n, k) => "Delete package " + n + " (" + k + " skills)?",
+      confirmPkgDeleteBody: "Every skill folder in the package goes to the Trash and every link is removed. The whole package is one action you can undo from History:",
+      pkgKeepWarn: (n) => "Note: " + n + " skills in this package are rated keep and will be deleted too.",
+      pkgGuessWarn: "Note: this package was guessed from name prefixes. Check that these skills really belong together.",
+      confirmPkgUninstallTitle: (n, a) => "Uninstall package " + n + " from " + a + "?",
+      confirmPkgUninstallBody: "Only these links in that agent are removed. Skill files and other agents stay:",
+      "act_delete-package": "Delete package",
+      "act_uninstall-package": "Uninstall package",
       known: "Known stale",
       link: "link",
       folder: "folder",
@@ -225,6 +273,10 @@
   }
 
   const open = new Set();
+  const openPkgs = new Set();
+  let view = "verdict";
+  try { view = localStorage.getItem("skill-sweep-view") || "verdict"; } catch (e) { /* storage blocked */ }
+  const pkgById = (id) => (report.packages || []).find((p) => p.id === id);
 
   function renderSummary() {
     const c = report.counts;
@@ -282,7 +334,8 @@
       "<div class='row-main' data-toggle='" + esc(s.id) + "' role='button' tabindex='0' aria-expanded='" + isOpen + "' aria-label='" + esc(s.name + " · " + t("expand")) + "'>" +
       (CFG.readonly ? "" : "<label class='check'><input type='checkbox' data-select='" + esc(s.id) + "'" + checked + " aria-label='" + esc(t("select") + " " + s.name) + "'></label>") +
       "<div class='who'><h3 class='name'><span class='nm'>" + esc(s.name) + "</span>" +
-      (s.known ? "<span class='tag'>" + esc(t("known")) + "</span>" : "") + "</h3>" +
+      (s.known ? "<span class='tag'>" + esc(t("known")) + "</span>" : "") +
+      (s.package && view === "verdict" ? "<span class='tag pkg-tag'>" + esc(pkgById(s.package).name) + "</span>" : "") + "</h3>" +
       "<p class='desc'>" + esc(s.description || "—") + "</p></div>" +
       "<div class='where'>" + esc(where) + "</div>" +
       "<div class='gauge' title='" + esc(t("score")) + " " + s.score + "/100'><span class='num'>" + s.score + "</span><span class='track'><i style='width:" + s.score + "%'></i></span></div>" +
@@ -298,6 +351,8 @@
     if (filter === "broken") { list.innerHTML = ""; renderBroken(true); return; }
     const skills = visibleSkills();
     if (!skills.length) { list.innerHTML = "<p class='empty'>" + esc(t("emptyList")) + "</p>"; renderBroken(false); return; }
+    $("#view-seg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+    if (view === "package") { list.innerHTML = renderPackages(skills); renderBroken(filter === "all"); return; }
     const hints = { remove: t("hintRemove"), consider: t("hintConsider"), keep: t("hintKeep") };
     let html = "";
     ["remove", "consider", "keep"].forEach((v) => {
@@ -309,6 +364,51 @@
     });
     list.innerHTML = html;
     renderBroken(filter === "all");
+  }
+
+  function miniDist(c) {
+    return "<span class='dist mini' aria-hidden='true'>" + ["remove", "consider", "keep"].filter((k) => c[k])
+      .map((k) => "<span class='" + k + "' style='flex-grow:" + c[k] + "'></span>").join("") + "</span>";
+  }
+
+  function pkgAgents(pkg) {
+    const set = new Set();
+    pkg.skill_ids.forEach((id) => { const s = skillById(id); if (s) s.installs.forEach((i) => { if (i.kind === "link") set.add(i.agent); }); });
+    return [...set].sort();
+  }
+
+  function renderPackages(skills) {
+    const visible = new Set(skills.map((s) => s.id));
+    let html = "";
+    (report.packages || []).forEach((p) => {
+      const members = p.skill_ids.filter((id) => visible.has(id)).map(skillById);
+      if (!members.length) return;
+      const isOpen = openPkgs.has(p.id);
+      const c = p.counts;
+      const verdictLine = c.remove || c.consider ? t("pkgCounts", c.remove, c.consider) : t("pkgAllKeep");
+      html += "<section class='pkg" + (isOpen ? " open" : "") + "'>" +
+        "<div class='pkg-head' data-pkg-toggle='" + esc(p.id) + "' role='button' tabindex='0' aria-expanded='" + isOpen + "'>" +
+        "<span class='chev' aria-hidden='true'></span>" +
+        "<div class='who'><h3 class='name'><span class='nm'>" + esc(p.name) + "</span><span class='tag" + (p.guessed ? " guess" : "") + "'>" + esc(t("kind_" + p.kind)) + "</span></h3>" +
+        "<p class='desc'>" + esc(t("pkgSkills", p.skill_ids.length)) + " · " + esc(verdictLine) + "</p></div>" +
+        miniDist(c) + "</div>";
+      if (isOpen) {
+        const agentsBtns = CFG.readonly ? "" : pkgAgents(p).map((a) =>
+          "<button class='small' data-pkg-uninstall='" + esc(p.id) + "' data-agent='" + esc(a) + "'>" + esc(t("pkgUninstall", a)) + "</button>").join("");
+        html += "<div class='pkg-body'><div class='pkg-actions'>" +
+          (p.detail ? "<span class='meta mono'>" + esc(t("pkgSource")) + ": " + esc(home(p.detail)) + "</span>" : "<span></span>") +
+          "<span class='acts'>" + agentsBtns +
+          (CFG.readonly ? "" : "<button class='small danger' data-pkg-delete='" + esc(p.id) + "'>" + esc(t("pkgDelete")) + "</button>") +
+          "</span></div><div class='rows'>" + members.map(renderRow).join("") + "</div></div>";
+      }
+      html += "</section>";
+    });
+    const loose = skills.filter((s) => !s.package);
+    if (loose.length) {
+      html += "<section class='group'><h2 class='group-title'>" + esc(t("ungrouped")) + " <span class='count'>" + loose.length +
+        "</span><span class='hint'>" + esc(t("ungroupedHint")) + "</span></h2><div class='rows'>" + loose.map(renderRow).join("") + "</div></section>";
+    }
+    return html;
   }
 
   function renderBroken(show) {
@@ -409,6 +509,42 @@
     await load();
   }
 
+  async function doDeletePackage(pid) {
+    const p = pkgById(pid);
+    const skills = p.skill_ids.map(skillById).filter(Boolean);
+    let body = "<p>" + esc(t("confirmPkgDeleteBody")) + "</p>";
+    if (p.counts.keep) body += "<div class='warn'>" + esc(t("pkgKeepWarn", p.counts.keep)) + "</div>";
+    if (p.guessed) body += "<div class='warn'>" + esc(t("pkgGuessWarn")) + "</div>";
+    body += skills.map((s) => "<h3>" + esc(s.name) + "</h3>" + deletePlan(s)).join("");
+    if (!(await confirmDialog(t("confirmPkgDeleteTitle", p.name, skills.length), body, t("doDelete")))) return;
+    try {
+      const r = await api("/api/delete-package", { package_id: pid });
+      skills.forEach((s) => selected.delete(s.id));
+      toast(t("done") + " · " + p.name, r.entry.id);
+    } catch (e) {
+      toast(t("error") + e.message);
+    }
+    await load();
+  }
+
+  async function doUninstallPackage(pid, agent) {
+    const p = pkgById(pid);
+    const links = [];
+    p.skill_ids.map(skillById).filter(Boolean).forEach((s) => s.installs.forEach((i) => {
+      if (i.agent === agent && i.kind === "link") links.push(i);
+    }));
+    const body = "<p>" + esc(t("confirmPkgUninstallBody")) + "</p><ul>" +
+      links.map((i) => "<li><code>" + esc(home(i.path)) + "</code></li>").join("") + "</ul>";
+    if (!(await confirmDialog(t("confirmPkgUninstallTitle", p.name, agent), body, t("doUninstall")))) return;
+    try {
+      const r = await api("/api/uninstall-package", { package_id: pid, agent });
+      toast(t("done") + " · " + p.name, r.entry.id);
+    } catch (e) {
+      toast(t("error") + e.message);
+    }
+    await load();
+  }
+
   async function doRestore(id) {
     try {
       await api("/api/restore", { entry_id: id });
@@ -441,15 +577,25 @@
     if (row) row.focus({ preventScroll: true });
   }
 
+  function togglePkg(id) {
+    if (openPkgs.has(id)) openPkgs.delete(id); else openPkgs.add(id);
+    renderList();
+    const head = document.querySelector("[data-pkg-toggle='" + CSS.escape(id) + "']");
+    if (head) head.focus({ preventScroll: true });
+  }
+
   document.addEventListener("keydown", (ev) => {
-    const el = ev.target.closest && ev.target.closest("[data-toggle]");
-    if (el && ev.target === el && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); toggleRow(el.dataset.toggle); }
+    const el = ev.target.closest && ev.target.closest("[data-toggle], [data-pkg-toggle]");
+    if (el && ev.target === el && (ev.key === "Enter" || ev.key === " ")) {
+      ev.preventDefault();
+      if (el.dataset.toggle) toggleRow(el.dataset.toggle); else togglePkg(el.dataset.pkgToggle);
+    }
     if (ev.key === "Escape" && !$("#drawer").hidden) closeDrawer();
   });
 
   document.addEventListener("click", (ev) => {
     if (ev.target.closest(".check")) return;
-    const el = ev.target.closest("button, [data-toggle]");
+    const el = ev.target.closest("button, [data-toggle], [data-pkg-toggle]");
     if (!el) return;
     const d = el.dataset;
     if (d.filter) { filter = filter === d.filter && d.filter !== "all" ? "all" : d.filter; render(); }
@@ -464,6 +610,14 @@
     else if (d.restore) doRestore(d.restore);
     else if (d.undo) { $("#toast").hidden = true; doRestore(d.undo); }
     else if (d.toggle) toggleRow(d.toggle);
+    else if (d.pkgToggle) togglePkg(d.pkgToggle);
+    else if (d.pkgDelete) doDeletePackage(d.pkgDelete);
+    else if (d.pkgUninstall) doUninstallPackage(d.pkgUninstall, d.agent);
+    else if (d.view) {
+      view = d.view;
+      try { localStorage.setItem("skill-sweep-view", view); } catch (e) { /* storage blocked */ }
+      renderList();
+    }
   });
 
   document.addEventListener("change", (ev) => {

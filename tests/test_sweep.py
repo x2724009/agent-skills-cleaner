@@ -120,5 +120,63 @@ class SweepTest(unittest.TestCase):
             actions.restore(entry["id"])
 
 
+class PackageTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = os.path.realpath(tempfile.mkdtemp())
+        self.root = os.path.join(self.tmp, "agent")
+        self.bundle = os.path.join(self.tmp, "my-bundle", "skills")
+        os.makedirs(self.root)
+        os.makedirs(self.bundle)
+        for n in ("novel-a", "novel-b"):
+            os.symlink(write_skill(self.bundle, n, PROMPT_ONLY.replace("be-careful", n)), os.path.join(self.root, n))
+        for n in ("obs-one", "obs-two", "obs-three", "solo"):
+            write_skill(self.root, n, TOOL_SKILL.replace("web-clean", n))
+        self.roots = [("Agent", self.root)]
+
+        self._saved = (actions.STATE_DIR, actions.HISTORY_PATH, actions.trash_dir)
+        actions.STATE_DIR = os.path.join(self.tmp, "state")
+        actions.HISTORY_PATH = os.path.join(actions.STATE_DIR, "history.json")
+        trash = os.path.join(self.tmp, "trash")
+        os.makedirs(trash)
+        actions.trash_dir = lambda: trash
+
+    def tearDown(self):
+        actions.STATE_DIR, actions.HISTORY_PATH, actions.trash_dir = self._saved
+        shutil.rmtree(self.tmp)
+
+    def report(self):
+        return analyze(scan(self.roots), known=[])
+
+    def test_groups_by_folder_and_prefix(self):
+        r = self.report()
+        pk = {p["name"]: p for p in r["packages"]}
+        self.assertEqual(pk["my-bundle"]["kind"], "folder")
+        self.assertEqual(len(pk["my-bundle"]["skill_ids"]), 2)
+        self.assertEqual(pk["obs"]["kind"], "prefix")
+        self.assertTrue(pk["obs"]["guessed"])
+        solo = next(s for s in r["skills"] if s["name"] == "solo")
+        self.assertIsNone(solo["package"])
+
+    def test_delete_package_is_one_undo(self):
+        r = self.report()
+        pkg = next(p for p in r["packages"] if p["name"] == "my-bundle")
+        skills = [s for s in r["skills"] if s["id"] in pkg["skill_ids"]]
+        entry = actions.delete_package(pkg["name"], skills)
+        self.assertFalse(os.listdir(self.bundle))
+        self.assertFalse(os.path.lexists(os.path.join(self.root, "novel-a")))
+        actions.restore(entry["id"])
+        self.assertEqual(sorted(os.listdir(self.bundle)), ["novel-a", "novel-b"])
+        self.assertTrue(os.path.islink(os.path.join(self.root, "novel-b")))
+
+    def test_uninstall_package_only_removes_links(self):
+        r = self.report()
+        pkg = next(p for p in r["packages"] if p["name"] == "my-bundle")
+        skills = [s for s in r["skills"] if s["id"] in pkg["skill_ids"]]
+        entry = actions.uninstall_package(pkg["name"], skills, "Agent")
+        self.assertEqual(len(entry["steps"]), 2)
+        self.assertEqual(sorted(os.listdir(self.bundle)), ["novel-a", "novel-b"])
+        self.assertFalse(os.path.lexists(os.path.join(self.root, "novel-a")))
+
+
 if __name__ == "__main__":
     unittest.main()

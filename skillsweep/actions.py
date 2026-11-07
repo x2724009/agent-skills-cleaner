@@ -85,8 +85,7 @@ def uninstall(skill, install_path):
     return _record("uninstall", skill["name"], [step])
 
 
-def delete(skill):
-    """Move the skill folder to the Trash and drop every link to it."""
+def _delete_steps(skill):
     real = skill["real_path"]
     if not os.path.isdir(real):
         raise ActionError("folder no longer exists: %s" % real)
@@ -95,9 +94,53 @@ def delete(skill):
         if install["kind"] == "link" and os.path.islink(install["path"]):
             steps.append(_unlink(install["path"]))
     dest = os.path.join(trash_dir(), "%s (skill-sweep %s)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S")))
+    n = 1
+    while os.path.lexists(dest):
+        n += 1
+        dest = os.path.join(trash_dir(), "%s (skill-sweep %s-%d)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S"), n))
     shutil.move(real, dest)
     steps.append({"op": "move", "src": real, "dst": dest})
-    return _record("delete", skill["name"], steps)
+    return steps
+
+
+def delete(skill):
+    """Move the skill folder to the Trash and drop every link to it."""
+    return _record("delete", skill["name"], _delete_steps(skill))
+
+
+def _record_partial(action, name, steps, err):
+    """Keep whatever already happened undoable, then report the failure."""
+    if steps:
+        entry = _record(action, name, steps)
+        raise ActionError("%s (partly done; undo it from History: %s)" % (err, entry["id"]))
+    raise ActionError(str(err))
+
+
+def delete_package(name, skills):
+    """Delete every skill in a package as one undoable action."""
+    steps = []
+    for skill in skills:
+        try:
+            steps.extend(_delete_steps(skill))
+        except (ActionError, OSError) as e:
+            _record_partial("delete-package", name, steps, "%s: %s" % (skill["name"], e))
+    return _record("delete-package", name, steps)
+
+
+def uninstall_package(name, skills, agent):
+    """Remove one agent's links to every skill in a package, as one action."""
+    steps = []
+    for skill in skills:
+        for install in skill["installs"]:
+            if install["agent"] != agent or install["kind"] != "link":
+                continue
+            try:
+                steps.append(_unlink(install["path"]))
+            except (ActionError, OSError) as e:
+                _record_partial("uninstall-package", name, steps, "%s: %s" % (skill["name"], e))
+    if not steps:
+        raise ActionError("%s has no links in %s" % (name, agent))
+    return _record("uninstall-package", "%s · %s" % (name, agent), steps)
 
 
 def remove_broken(link_path, name):

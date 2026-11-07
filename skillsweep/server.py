@@ -41,6 +41,12 @@ class State:
                 return s
         raise actions.ActionError("unknown skill; rescan and try again")
 
+    def find_package(self, package_id):
+        for p in (self.report or {}).get("packages", []):
+            if p["id"] == package_id:
+                return p, [self.find_skill(i) for i in p["skill_ids"]]
+        raise actions.ActionError("unknown package; rescan and try again")
+
     def find_broken(self, broken_id):
         for b in (self.report or {}).get("broken", []):
             if b["id"] == broken_id:
@@ -115,6 +121,12 @@ def make_handler(state, port):
                         entry = actions.uninstall(state.find_skill(data.get("skill_id")), data.get("path"))
                     elif path == "/api/delete":
                         entry = actions.delete(state.find_skill(data.get("skill_id")))
+                    elif path == "/api/delete-package":
+                        pkg, skills = state.find_package(data.get("package_id"))
+                        entry = actions.delete_package(pkg["name"], skills)
+                    elif path == "/api/uninstall-package":
+                        pkg, skills = state.find_package(data.get("package_id"))
+                        entry = actions.uninstall_package(pkg["name"], skills, data.get("agent"))
                     elif path == "/api/remove-broken":
                         b = state.find_broken(data.get("broken_id"))
                         entry = actions.remove_broken(b["path"], b["name"])

@@ -11,6 +11,7 @@ Skill Sweep 会扫描你电脑上各个 AI 工具的 skills 目录，给每个 s
 ## 功能
 
 - **一次看全**：Claude Code、Codex、Cursor、Gemini CLI、GitHub Copilot、OpenCode、Windsurf、Kiro、Qwen Code、Trae，以及共享的 `~/.agents/skills`。同一个 skill 被链接到多个工具时合并显示。
+- **按技能包分组**：一起安装的一套技能（如飞书 lark-*、superpowers）会归成一个包，可以整包卸载或删除，整包算一次操作、一次撤销。识别依据依次是：安装器 lock 文件、插件清单、git 仓库、已知清单、同一文件夹、名称前缀（最后这条只是推测，界面上会标明）。
 - **拖累指数 + 理由**：每个 skill 都列出加分、减分的具体原因，不是黑箱。
 - **两种清理**：
   - **卸载**：只移除某个工具里的链接，原文件和其他工具不受影响。
@@ -123,6 +124,7 @@ There is nothing to install: the tool uses only the Python standard library and 
 
 - **Scans many agents**: Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, OpenCode, Windsurf, Kiro, Qwen Code, Trae and the shared `~/.agents/skills` folder. A skill linked into several agents is shown once.
 - **Drag index with reasons**: every point added or removed is explained. See the table above.
+- **Packages**: skills installed together (for example lark-* or superpowers) are grouped, and a whole package can be uninstalled or deleted as one undoable action. Packages are detected from installer lock files, plugin manifests, git repositories, the known list, a shared folder, and finally shared name prefixes (marked as a guess).
 - **Uninstall** removes one agent's symlink. **Delete** moves the folder to the Trash and removes every link to it.
 - **Everything is undoable** from the History panel.
 - **Finds broken symlinks.**
