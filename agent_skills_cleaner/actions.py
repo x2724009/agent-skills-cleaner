@@ -222,11 +222,11 @@ def _check_restorable(steps):
         if os.path.lexists(step["src"]):
             raise ActionError("something already exists at %s" % step["src"])
         try:
-            os.listdir(os.path.dirname(step["dst"]))
+            os.lstat(step["dst"])  # the exact item only: macOS may block listing the Trash but allow this
+        except FileNotFoundError:
+            raise ActionError("no longer at %s" % step["dst"])
         except OSError as e:
             raise ActionError(_explain(e))
-        if not os.path.exists(step["dst"]):
-            raise ActionError("no longer at %s" % step["dst"])
 
 
 def restore(entry_id):
