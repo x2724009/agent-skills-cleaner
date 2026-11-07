@@ -58,7 +58,7 @@ def make_handler(state, port):
     allowed_hosts = {"127.0.0.1:%d" % port, "localhost:%d" % port}
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "skill-sweep/" + __version__
+        server_version = "skillmolt/" + __version__
 
         def log_message(self, fmt, *args):
             pass
@@ -168,10 +168,10 @@ def serve(port=7457, open_browser=True, readonly=False, roots=None):
     if httpd is None:
         raise SystemExit("ports %d-%d are all in use; pick one with --port" % (port, port + 19))
     if candidate != port:
-        print("port %d is busy (another skill-sweep may be running); using %d instead" % (port, candidate))
+        print("port %d is busy (another skillmolt may be running); using %d instead" % (port, candidate))
     port = candidate
     url = "http://127.0.0.1:%d/" % port
-    print("skill-sweep %s running at %s  (Ctrl+C to stop)" % (__version__, url))
+    print("skillmolt %s running at %s  (Ctrl+C to stop)" % (__version__, url))
     if readonly:
         print("read-only mode: uninstall/delete are disabled")
     if open_browser:

@@ -38,7 +38,7 @@ def report(as_json, roots=None):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="skill-sweep", description="Find agent skills that hold modern models back.")
+    p = argparse.ArgumentParser(prog="skillmolt", description="Find agent skills that hold modern models back.")
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--root", action="append", metavar="AGENT=PATH",
                    help="scan this skills folder instead of the defaults (repeatable)")

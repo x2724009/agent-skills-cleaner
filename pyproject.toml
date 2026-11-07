@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "skill-sweep"
+name = "skillmolt"
 version = "0.1.0"
 description = "Find agent skills that hold modern models back, and clean them up from a local web page."
 readme = "README.md"
@@ -12,10 +12,10 @@ requires-python = ">=3.8"
 keywords = ["agent", "skills", "claude-code", "codex", "cursor", "llm"]
 
 [project.scripts]
-skill-sweep = "skillsweep.__main__:main"
+skillmolt = "skillmolt.__main__:main"
 
 [tool.setuptools]
-packages = ["skillsweep"]
+packages = ["skillmolt"]
 
 [tool.setuptools.package-data]
-skillsweep = ["web/*", "data/*.json"]
+skillmolt = ["web/*", "data/*.json"]

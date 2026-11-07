@@ -1,12 +1,12 @@
 (function () {
   "use strict";
 
-  const CFG = window.SKILL_SWEEP;
+  const CFG = window.SKILLMOLT;
   const $ = (sel) => document.querySelector(sel);
 
   const I18N = {
     zh: {
-      tagline: "找出跟不上模型能力、反而拖累模型的 skills，一键卸载或删除",
+      tagline: "管理电脑上所有 AI 工具的 skills，蜕掉模型已经用不上的旧壳",
       rescan: "重新扫描",
       history: "操作记录",
       readonlyBanner: "只读模式：可以查看分析结果，卸载和删除已禁用",
@@ -92,14 +92,14 @@
       restored: "已撤销",
       restore: "撤销",
       noHistory: "还没有操作记录",
-      historyHint: "所有操作都会记在 ~/.skill-sweep/history.json，删除的文件在废纸篓里，随时可以恢复。",
+      historyHint: "所有操作都会记在 ~/.skillmolt/history.json，删除的文件在废纸篓里，随时可以恢复。",
       act_uninstall: "卸载",
       act_delete: "删除",
       "act_remove-broken": "移除失效链接",
       error: "出错了：",
     },
     en: {
-      tagline: "Find agent skills that hold modern models back, and clean them up",
+      tagline: "Manage every agent's skills and shed the ones your models have outgrown",
       rescan: "Rescan",
       history: "History",
       readonlyBanner: "Read-only mode: analysis only, uninstall and delete are disabled",
@@ -185,7 +185,7 @@
       restored: "Undone",
       restore: "Undo",
       noHistory: "Nothing yet",
-      historyHint: "Every action is logged in ~/.skill-sweep/history.json and deleted files sit in the Trash, so everything can be restored.",
+      historyHint: "Every action is logged in ~/.skillmolt/history.json and deleted files sit in the Trash, so everything can be restored.",
       act_uninstall: "Uninstall",
       act_delete: "Delete",
       "act_remove-broken": "Remove broken link",
@@ -194,7 +194,7 @@
   };
 
   let lang = "zh";
-  try { lang = localStorage.getItem("skill-sweep-lang") || (navigator.language.startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage blocked */ }
+  try { lang = localStorage.getItem("skillmolt-lang") || (navigator.language.startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage blocked */ }
   const t = (k, ...a) => { const v = I18N[lang][k]; return typeof v === "function" ? v(...a) : v; };
 
   let report = null;
@@ -275,7 +275,7 @@
   const open = new Set();
   const openPkgs = new Set();
   let view = "verdict";
-  try { view = localStorage.getItem("skill-sweep-view") || "verdict"; } catch (e) { /* storage blocked */ }
+  try { view = localStorage.getItem("skillmolt-view") || "verdict"; } catch (e) { /* storage blocked */ }
   const pkgById = (id) => (report.packages || []).find((p) => p.id === id);
 
   function renderSummary() {
@@ -615,7 +615,7 @@
     else if (d.pkgUninstall) doUninstallPackage(d.pkgUninstall, d.agent);
     else if (d.view) {
       view = d.view;
-      try { localStorage.setItem("skill-sweep-view", view); } catch (e) { /* storage blocked */ }
+      try { localStorage.setItem("skillmolt-view", view); } catch (e) { /* storage blocked */ }
       renderList();
     }
   });
@@ -633,7 +633,7 @@
   $("#btn-bulk").addEventListener("click", () => doDelete([...selected]));
   $("#btn-lang").addEventListener("click", () => {
     lang = lang === "zh" ? "en" : "zh";
-    try { localStorage.setItem("skill-sweep-lang", lang); } catch (e) { /* storage blocked */ }
+    try { localStorage.setItem("skillmolt-lang", lang); } catch (e) { /* storage blocked */ }
     render();
     if (!$("#drawer").hidden) loadHistory();
   });

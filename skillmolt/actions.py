@@ -4,7 +4,7 @@
 - delete:    move the skill folder to the system Trash and remove every
              symlink that pointed at it.
 
-Every operation is written to ~/.skill-sweep/history.json with enough
+Every operation is written to ~/.skillmolt/history.json with enough
 detail to undo it, and nothing is ever removed permanently.
 """
 
@@ -15,8 +15,9 @@ import sys
 import time
 import uuid
 
-STATE_DIR = os.path.expanduser("~/.skill-sweep")
+STATE_DIR = os.path.expanduser("~/.skillmolt")
 HISTORY_PATH = os.path.join(STATE_DIR, "history.json")
+LEGACY_STATE_DIR = os.path.expanduser("~/.skill-sweep")  # name before the SkillMolt rename
 
 
 class ActionError(Exception):
@@ -35,7 +36,16 @@ def trash_dir():
     return path
 
 
+def _migrate_legacy():
+    """Carry undo history over from the old ~/.skill-sweep folder once."""
+    if STATE_DIR != os.path.expanduser("~/.skillmolt"):
+        return  # tests and custom setups manage their own state
+    if os.path.isdir(LEGACY_STATE_DIR) and not os.path.exists(STATE_DIR):
+        os.rename(LEGACY_STATE_DIR, STATE_DIR)
+
+
 def load_history():
+    _migrate_legacy()
     try:
         with open(HISTORY_PATH, encoding="utf-8") as f:
             return json.load(f)
@@ -93,11 +103,11 @@ def _delete_steps(skill):
     for install in skill["installs"]:
         if install["kind"] == "link" and os.path.islink(install["path"]):
             steps.append(_unlink(install["path"]))
-    dest = os.path.join(trash_dir(), "%s (skill-sweep %s)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S")))
+    dest = os.path.join(trash_dir(), "%s (skillmolt %s)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S")))
     n = 1
     while os.path.lexists(dest):
         n += 1
-        dest = os.path.join(trash_dir(), "%s (skill-sweep %s-%d)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S"), n))
+        dest = os.path.join(trash_dir(), "%s (skillmolt %s-%d)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S"), n))
     shutil.move(real, dest)
     steps.append({"op": "move", "src": real, "dst": dest})
     return steps

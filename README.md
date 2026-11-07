@@ -1,12 +1,20 @@
-# Skill Sweep
+<p align="center"><img src="skillmolt/web/icon.svg" width="120" alt="SkillMolt logo: a blue crab stepping out of its old shell"></p>
 
-**找出跟不上模型能力、反而拖累模型的 agent skills，在网页里一键卸载或删除。**
+<h1 align="center">SkillMolt 蜕壳</h1>
 
-[English](#english) · 中文
+<p align="center"><b>管理电脑上所有 AI 工具的 skills，找出模型已经用不上、反而拖累它的那些，一键清理，随时恢复。</b></p>
 
-很多 skill 写于更早一代模型：教模型"先想再做""写完要验证""不准偷懒截断"。对 GPT、Claude、DeepSeek 的当前一代模型，这些它们早就会了。这类 skill 每次都要被读进上下文，还会把简单任务拖进固定流程，反而成了累赘。
+<p align="center"><a href="#english">English</a> · 中文</p>
 
-Skill Sweep 会扫描你电脑上各个 AI 工具的 skills 目录，给每个 skill 打一个**拖累指数**，写清理由，然后让你在本地网页里点一下就卸载或删除。删除只会挪进废纸篓，随时能撤销。
+螃蟹要长大，就得蜕掉旧壳。模型也一样：很多 skill 写于更早一代模型，教它"先想再做""写完要验证""不准偷懒截断"。当前一代的 Claude、GPT、DeepSeek 早就会了，这些 skill 却每次都被读进上下文，还把简单任务拖进固定流程。
+
+SkillMolt 会：
+
+1. **找全**：扫描 Claude Code、Codex、Cursor、Gemini CLI、Copilot 等工具的 skills 目录，以及各种软件安装时顺带写进来的 skills，标出它们来自哪个安装器、插件或仓库。
+2. **判断**：给每个 skill 打一个**拖累指数**并写清理由。
+3. **清理**：在本地网页里卸载或删除，删除只进废纸篓，每一步都能撤销。
+
+**规划中**：按每个工具实际使用的模型分别评判（弱一些的模型可能仍需要流程型 skill），以及从本地会话记录统计每个 skill 的实际使用频率。
 
 ## 功能
 
@@ -16,7 +24,7 @@ Skill Sweep 会扫描你电脑上各个 AI 工具的 skills 目录，给每个 s
 - **两种清理**：
   - **卸载**：只移除某个工具里的链接，原文件和其他工具不受影响。
   - **删除**：把 skill 文件夹移到废纸篓，并移除所有指向它的链接。
-- **全部可撤销**：每次操作都记在 `~/.skill-sweep/history.json`，在网页"操作记录"里一键恢复。
+- **全部可撤销**：每次操作都记在 `~/.skillmolt/history.json`，在网页"操作记录"里一键恢复。
 - **失效链接**：找出指向已不存在文件夹的链接。
 - **中英双语**界面，跟随系统深浅色。
 - **零依赖**：只用 Python 标准库（3.8+），不需要 `pip install` 任何东西。
@@ -24,9 +32,9 @@ Skill Sweep 会扫描你电脑上各个 AI 工具的 skills 目录，给每个 s
 ## 快速开始
 
 ```bash
-git clone https://github.com/x2724009/skill-sweep.git
-cd skill-sweep
-python3 -m skillsweep
+git clone https://github.com/x2724009/skillmolt.git
+cd skillmolt
+python3 -m skillmolt
 ```
 
 浏览器会自动打开 `http://127.0.0.1:7457/`。
@@ -34,13 +42,13 @@ python3 -m skillsweep
 其他用法：
 
 ```bash
-python3 -m skillsweep serve --readonly        # 只看分析，禁用卸载和删除
-python3 -m skillsweep report                  # 在终端输出结果
-python3 -m skillsweep report --json           # 输出 JSON
-python3 -m skillsweep --root "MyAgent=~/my/skills" serve   # 扫描指定目录
+python3 -m skillmolt serve --readonly        # 只看分析，禁用卸载和删除
+python3 -m skillmolt report                  # 在终端输出结果
+python3 -m skillmolt report --json           # 输出 JSON
+python3 -m skillmolt --root "MyAgent=~/my/skills" serve   # 扫描指定目录
 ```
 
-也可以安装成命令：`pip install .`，之后直接运行 `skill-sweep`。
+也可以安装成命令：`pip install .`，之后直接运行 `skillmolt`。
 
 ## 拖累指数怎么算
 
@@ -60,7 +68,7 @@ python3 -m skillsweep --root "MyAgent=~/my/skills" serve   # 扫描指定目录
 
 **≥60 建议删除，35–59 可以考虑，<35 建议保留。**
 
-社区维护的[已知过时清单](skillsweep/data/known.json)优先于自动规则。比如 superpowers 系列、`karpathy-guidelines`、`full-output-enforcement`。
+社区维护的[已知过时清单](skillmolt/data/known.json)优先于自动规则。比如 superpowers 系列、`karpathy-guidelines`、`full-output-enforcement`。
 
 分数只是参考，最终由你决定。一个 skill 对你有没有用，取决于你用什么模型、做什么事。
 
@@ -73,7 +81,7 @@ python3 -m skillsweep --root "MyAgent=~/my/skills" serve   # 扫描指定目录
 
 ## 贡献已知过时的 skill
 
-编辑 [`skillsweep/data/known.json`](skillsweep/data/known.json)，加一条规则：
+编辑 [`skillmolt/data/known.json`](skillmolt/data/known.json)，加一条规则：
 
 ```json
 {
@@ -104,18 +112,20 @@ MIT
 
 ## English
 
-**Find agent skills that hold modern models back, and uninstall or delete them from a local web page.**
+**Manage the skills of every AI agent on your machine, find the ones your models have outgrown, and clean them up with one click. Everything can be undone.**
+
+A crab has to molt its old shell to grow. Models outgrow skills the same way.
 
 Many skills were written for an older generation of models. They tell the model to "think first", "verify before claiming done" or "never truncate output". Current GPT, Claude and DeepSeek models already do all of that. Such skills still get loaded into context on every trigger, and they drag simple tasks through a fixed ceremony.
 
-Skill Sweep scans the skills folders of your AI tools and gives each skill a **drag index** with reasons. You can then uninstall or delete a skill with one click. Deleted skills go to the Trash and every action can be undone.
+SkillMolt scans the skills folders of your AI tools and gives each skill a **drag index** with reasons. You can then uninstall or delete a skill with one click. Deleted skills go to the Trash and every action can be undone.
 
 ### Quick start
 
 ```bash
-git clone https://github.com/x2724009/skill-sweep.git
-cd skill-sweep
-python3 -m skillsweep
+git clone https://github.com/x2724009/skillmolt.git
+cd skillmolt
+python3 -m skillmolt
 ```
 
 There is nothing to install: the tool uses only the Python standard library and needs Python 3.8+.
@@ -130,4 +140,4 @@ There is nothing to install: the tool uses only the Python standard library and 
 - **Finds broken symlinks.**
 - **Safe by design**: the server listens on localhost only, uses a per-run token and Host checks, acts only on scanned skills and never deletes permanently.
 
-Contributions to the [known list](skillsweep/data/known.json) are welcome.
+Contributions to the [known list](skillmolt/data/known.json) are welcome.

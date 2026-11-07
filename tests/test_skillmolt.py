@@ -3,9 +3,9 @@ import shutil
 import tempfile
 import unittest
 
-from skillsweep import actions
-from skillsweep.analyzer import analyze
-from skillsweep.scanner import parse_frontmatter, scan
+from skillmolt import actions
+from skillmolt.analyzer import analyze
+from skillmolt.scanner import parse_frontmatter, scan
 
 PROMPT_ONLY = """---
 name: be-careful
@@ -42,7 +42,7 @@ def write_skill(root, name, text, script=False):
     return path
 
 
-class SweepTest(unittest.TestCase):
+class SkillTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.shared = os.path.join(self.tmp, "shared")

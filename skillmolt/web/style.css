@@ -305,3 +305,4 @@ dialog ul { padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; max-he
   .seg button { flex: 1; }
 }
 .pkg-head > * { grid-area: auto; }
+.brand h1 .cn { font-weight: 500; color: var(--muted); margin-left: 4px; }
