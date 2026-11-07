@@ -157,7 +157,19 @@ def make_handler(state, port):
 def serve(port=7457, open_browser=True, readonly=False, roots=None):
     state = State(readonly, roots)
     state.rescan()
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(state, port))
+    httpd = None
+    for candidate in range(port, port + 20):
+        try:
+            httpd = ThreadingHTTPServer(("127.0.0.1", candidate), make_handler(state, candidate))
+            break
+        except OSError as e:
+            if e.errno not in (48, 98, 10048):  # address already in use (macOS, Linux, Windows)
+                raise
+    if httpd is None:
+        raise SystemExit("ports %d-%d are all in use; pick one with --port" % (port, port + 19))
+    if candidate != port:
+        print("port %d is busy (another skill-sweep may be running); using %d instead" % (port, candidate))
+    port = candidate
     url = "http://127.0.0.1:%d/" % port
     print("skill-sweep %s running at %s  (Ctrl+C to stop)" % (__version__, url))
     if readonly:
