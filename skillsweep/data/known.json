@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "about": "Skills that people have found to be superseded by current frontier models. Matched by folder or frontmatter name. Send a PR to add one: say what the skill does and why a current model no longer needs it.",
+  "rules": [
+    {
+      "names": ["using-superpowers"],
+      "group": "superpowers",
+      "verdict": "remove",
+      "reason": {
+        "zh": "要求每次对话都先去查找并调用技能，给所有任务加了一道门槛；现在的模型会自己判断何时需要技能",
+        "en": "Forces a skill lookup at the start of every conversation; current models decide on their own when a skill is needed"
+      }
+    },
+    {
+      "names": ["brainstorming", "writing-plans", "executing-plans", "subagent-driven-development", "dispatching-parallel-agents"],
+      "group": "superpowers",
+      "verdict": "remove",
+      "reason": {
+        "zh": "superpowers 工作流的一环（构思→计划→执行→分派）。前沿模型本身就会规划和拆分任务，固定流程反而拖慢简单任务",
+        "en": "Part of the superpowers ceremony (brainstorm, plan, execute, dispatch). Frontier models plan and split work themselves; the fixed ritual slows simple tasks"
+      }
+    },
+    {
+      "names": ["test-driven-development", "systematic-debugging", "verification-before-completion"],
+      "group": "superpowers",
+      "verdict": "remove",
+      "reason": {
+        "zh": "superpowers 的工程纪律提示（测试先行、系统排错、完成前验证）。这些已是前沿模型的默认做法",
+        "en": "superpowers discipline prompts (test first, debug systematically, verify before done). These are default behaviour for frontier models now"
+      }
+    },
+    {
+      "names": ["requesting-code-review", "receiving-code-review", "using-git-worktrees", "finishing-a-development-branch"],
+      "group": "superpowers",
+      "verdict": "remove",
+      "reason": {
+        "zh": "superpowers 的 Git 与代码评审流程提示。现在的编程智能体自带评审和分支管理能力",
+        "en": "superpowers git and review ceremony. Current coding agents ship their own review and branch handling"
+      }
+    },
+    {
+      "names": ["writing-skills"],
+      "group": "superpowers",
+      "verdict": "consider",
+      "reason": {
+        "zh": "教模型写技能的长篇指南。只在你自己写技能时有用，平时不必常驻",
+        "en": "Long guide on authoring skills. Only useful while you write skills yourself"
+      }
+    },
+    {
+      "names": ["karpathy-guidelines"],
+      "verdict": "remove",
+      "reason": {
+        "zh": "减少写代码常见错误的行为准则，前沿模型已经内化",
+        "en": "Behavioural guidelines against common coding mistakes, already internalised by frontier models"
+      }
+    },
+    {
+      "names": ["full-output-enforcement"],
+      "verdict": "remove",
+      "reason": {
+        "zh": "针对早期模型“偷懒截断、用占位符”的问题。现在的模型没有这个毛病，强制全量输出反而让回答冗长",
+        "en": "Targets old models that truncated output or left placeholders. Current models do not, and forcing full output makes answers bloated"
+      }
+    },
+    {
+      "names": ["neat-freak"],
+      "verdict": "consider",
+      "reason": {
+        "zh": "会在会话结束时自动改写项目文档和记忆文件，可能和你自己的知识管理规则冲突",
+        "en": "Rewrites project docs and memory files at session end, which can clash with your own knowledge rules"
+      }
+    },
+    {
+      "names": ["doc-coauthoring"],
+      "verdict": "consider",
+      "reason": {
+        "zh": "合写文档的流程引导。前沿模型不需要这套流程也能合写",
+        "en": "A guided co-writing workflow. Frontier models co-write fine without it"
+      }
+    },
+    {
+      "names": ["algorithmic-art"],
+      "verdict": "consider",
+      "reason": {
+        "zh": "p5.js 生成艺术的示例与模板，前沿模型可以直接写",
+        "en": "p5.js generative-art examples; frontier models write these directly"
+      }
+    }
+  ]
+}

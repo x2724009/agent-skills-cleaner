@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Sweep</title>
+<link rel="icon" href="/icon.svg">
+<link rel="stylesheet" href="/style.css">
+<script>window.SKILL_SWEEP = { token: "__TOKEN__", readonly: __READONLY__ };</script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img src="/icon.svg" alt="" width="28" height="28">
+    <div>
+      <h1>Skill Sweep</h1>
+      <p class="sub" data-i18n="tagline"></p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button class="ghost" id="btn-history" data-i18n="history"></button>
+    <button class="ghost" id="btn-lang">EN</button>
+    <button class="primary" id="btn-rescan" data-i18n="rescan"></button>
+  </div>
+</header>
+
+<div class="banner" id="readonly-banner" hidden data-i18n="readonlyBanner"></div>
+
+<main>
+  <section class="summary" id="summary"></section>
+
+  <details class="how">
+    <summary data-i18n="howTitle"></summary>
+    <div data-i18n-html="howBody"></div>
+  </details>
+
+  <section class="toolbar">
+    <input type="search" id="q" data-i18n-placeholder="search">
+    <select id="agent"></select>
+    <button class="danger" id="btn-bulk" hidden></button>
+  </section>
+
+  <section id="list" aria-live="polite"></section>
+  <section id="broken"></section>
+</main>
+
+<aside class="drawer" id="drawer" hidden>
+  <div class="drawer-head">
+    <h2 data-i18n="history"></h2>
+    <button class="ghost" id="btn-close-drawer" aria-label="close">✕</button>
+  </div>
+  <p class="muted" data-i18n="historyHint"></p>
+  <div id="history"></div>
+</aside>
+
+<dialog id="confirm">
+  <form method="dialog">
+    <h2 id="confirm-title"></h2>
+    <div id="confirm-body"></div>
+    <div class="dialog-actions">
+      <button value="cancel" class="ghost" data-i18n="cancel"></button>
+      <button value="ok" class="danger" id="confirm-ok"></button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>
