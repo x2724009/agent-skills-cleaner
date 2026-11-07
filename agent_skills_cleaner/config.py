@@ -1,7 +1,7 @@
-"""Per-agent settings: which model each agent runs and how capable it is.
+"""Optional per-agent overrides for the detected model and tier.
 
-Stored in ~/.skillmolt/config.json next to the undo history. The tier is
-recorded now so scoring can take it into account later.
+Models are detected automatically (see models.py). Anything saved here wins
+over detection. Stored next to the undo history.
 """
 
 import json
@@ -12,20 +12,13 @@ from . import actions
 TIERS = ("frontier", "mid", "small")
 MAX_LEN = 80
 
-# Sensible guesses for agents tied to one vendor; everything else starts blank.
-DEFAULTS = {
-    "Claude Code": {"model": "Claude", "tier": "frontier"},
-    "Codex": {"model": "GPT", "tier": "frontier"},
-    "Gemini CLI": {"model": "Gemini", "tier": "frontier"},
-}
-
-
 def config_path():
     return os.path.join(actions.STATE_DIR, "config.json")
 
 
 def load_config():
-    agents = {k: dict(v) for k, v in DEFAULTS.items()}
+    actions._migrate_legacy()
+    agents = {}
     try:
         with open(config_path(), encoding="utf-8") as f:
             saved = json.load(f).get("agents", {})

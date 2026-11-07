@@ -4,9 +4,7 @@ import os
 import sys
 
 from . import __version__
-from . import config
-from .analyzer import analyze
-from .scanner import scan
+from .analyzer import analyze_with_models
 
 LABELS = {"remove": "REMOVE  ", "consider": "CONSIDER", "keep": "KEEP    "}
 
@@ -23,12 +21,18 @@ def parse_roots(values):
 
 
 def report(as_json, roots=None):
-    tiers = {k: v.get("tier") for k, v in config.load_config()["agents"].items()}
-    result = analyze(scan(roots), agent_tiers=tiers)
+    result = analyze_with_models(roots)
     if as_json:
         json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
         print()
         return
+    print("Models (detected from each agent's config):")
+    for agent, p in result["profile"].items():
+        if not (p.get("model") or p["readers"]):
+            continue
+        extra = "".join("; also read by %s (%s, %s)" % (r["name"], r["model"] or "?", r["tier"] or "?") for r in p["readers"])
+        print("  %-20s %s (%s)%s -> judged as %s" % (agent, p.get("model") or "?", p.get("tier") or "?", extra, p["effective"]))
+    print()
     for s in result["skills"]:
         agents = ", ".join(sorted({i["agent"] for i in s["installs"]}))
         print("%s %3d  %-34s %s" % (LABELS[s["verdict"]], s["score"], s["name"][:34], agents))
@@ -40,7 +44,7 @@ def report(as_json, roots=None):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="skillmolt", description="Find agent skills that hold modern models back.")
+    p = argparse.ArgumentParser(prog="agent-skills-cleaner", description="Find agent skills that hold modern models back.")
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("--root", action="append", metavar="AGENT=PATH",
                    help="scan this skills folder instead of the defaults (repeatable)")

@@ -25,6 +25,9 @@ DEFAULT_ROOTS = [
     ("Kiro", "~/.kiro/skills"),
     ("Qwen Code", "~/.qwen/skills"),
     ("Trae", "~/.trae/skills"),
+    ("Qoder", "~/.qoder/skills"),
+    ("CodeBuddy", "~/.codebuddy/skills"),
+    ("WorkBuddy", "~/.workbuddy/skills"),
 ]
 
 LOCK_FILES = ["~/.agents/.skill-lock.json"]
@@ -86,7 +89,11 @@ def parse_frontmatter(text):
 
 def _walk_stats(folder):
     stats = {"files": 0, "bytes": 0, "code_files": 0, "tool_markers": [], "data_dirs": [], "newest": 0.0}
-    for top in os.listdir(folder):
+    try:
+        tops = os.listdir(folder)
+    except OSError:
+        tops = []
+    for top in tops:
         if top in DATA_DIRS and os.path.isdir(os.path.join(folder, top)):
             stats["data_dirs"].append(top)
         if top in TOOL_MARKERS:
@@ -147,12 +154,19 @@ def scan(roots=None):
         root_info.append({"agent": agent, "path": root, "exists": exists})
         if not exists:
             continue
-        for entry in sorted(os.listdir(root)):
+        try:
+            entries = sorted(os.listdir(root))
+        except OSError:
+            continue  # unreadable folder: skip it rather than abort the whole scan
+        for entry in entries:
             if entry.startswith("."):
                 continue
             path = os.path.join(root, entry)
             is_link = os.path.islink(path)
-            target = os.readlink(path) if is_link else None
+            try:
+                target = os.readlink(path) if is_link else None
+            except OSError:
+                continue
             if is_link and not os.path.exists(path):
                 broken.append({"agent": agent, "path": path, "name": entry, "target": target})
                 continue
@@ -166,8 +180,11 @@ def scan(roots=None):
 
     skills = []
     for real, installs in by_real.items():
-        with open(os.path.join(real, "SKILL.md"), encoding="utf-8", errors="replace") as f:
-            text = f.read()
+        try:
+            with open(os.path.join(real, "SKILL.md"), encoding="utf-8", errors="replace") as f:
+                text = f.read()
+        except OSError:
+            continue
         meta, body = parse_frontmatter(text)
         name = meta.get("name") or os.path.basename(real)
         stats = _walk_stats(real)

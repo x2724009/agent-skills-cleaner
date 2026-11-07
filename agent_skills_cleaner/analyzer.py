@@ -291,3 +291,16 @@ def analyze(scan_result, known=None, agent_tiers=None):
         "counts": counts,
         "home": os.path.expanduser("~"),
     }
+
+
+def analyze_with_models(roots=None, known=None):
+    """Scan, detect each agent's model, apply overrides, then score."""
+    from . import config, models
+    from .scanner import scan
+
+    result = scan(roots)
+    names = [r["agent"] for r in result["roots"] if r["exists"]]
+    profile = models.effective_profile(models.detect(), config.load_config()["agents"], names)
+    report = analyze(result, known=known, agent_tiers={k: v["effective"] for k, v in profile.items()})
+    report["profile"] = profile
+    return report

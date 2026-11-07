@@ -332,3 +332,8 @@ dialog ul { padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; max-he
   .model-row { grid-template-columns: minmax(0, 1fr) 110px; }
   .model-row .agent { grid-column: 1 / -1; }
 }
+.agents button .reader { color: var(--consider); font-size: 11.5px; font-weight: 600; }
+.model-row .agent { display: flex; flex-direction: column; }
+.model-row .src { font-weight: 400; font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
+.model-row { grid-template-columns: 170px minmax(0, 1fr) 130px; }
+.reader-note { margin-top: 8px; background: var(--consider-soft); color: var(--consider); padding: 8px 10px; border-radius: 8px; }

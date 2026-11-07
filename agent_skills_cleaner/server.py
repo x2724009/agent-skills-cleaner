@@ -11,8 +11,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import __version__, actions, config
-from .analyzer import analyze
-from .scanner import scan
+from .analyzer import analyze_with_models
 
 WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 STATIC = {
@@ -32,8 +31,7 @@ class State:
 
     def rescan(self):
         with self.lock:
-            tiers = {k: v.get("tier") for k, v in config.load_config()["agents"].items()}
-            self.report = analyze(scan(self.roots), agent_tiers=tiers)
+            self.report = analyze_with_models(self.roots)
             return self.report
 
     def find_skill(self, skill_id):
@@ -59,7 +57,7 @@ def make_handler(state, port):
     allowed_hosts = {"127.0.0.1:%d" % port, "localhost:%d" % port}
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "skillmolt/" + __version__
+        server_version = "agent-skills-cleaner/" + __version__
 
         def log_message(self, fmt, *args):
             pass
@@ -176,12 +174,12 @@ def serve(port=7457, open_browser=True, readonly=False, roots=None):
     if httpd is None:
         raise SystemExit("ports %d-%d are all in use; pick one with --port" % (port, port + 19))
     if candidate != port:
-        print("port %d is busy (another skillmolt may be running); using %d instead" % (port, candidate))
+        print("port %d is busy (another agent-skills-cleaner may be running); using %d instead" % (port, candidate), flush=True)
     port = candidate
     url = "http://127.0.0.1:%d/" % port
-    print("skillmolt %s running at %s  (Ctrl+C to stop)" % (__version__, url))
+    print("agent-skills-cleaner %s running at %s  (Ctrl+C to stop)" % (__version__, url), flush=True)
     if readonly:
-        print("read-only mode: uninstall/delete are disabled")
+        print("read-only mode: uninstall/delete are disabled", flush=True)
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
     try:

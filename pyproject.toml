@@ -3,19 +3,23 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "skillmolt"
+name = "agent-skills-cleaner"
 version = "0.1.0"
-description = "Find agent skills that hold modern models back, and clean them up from a local web page."
+description = "Find, audit and clean up the agent skills (SKILL.md) installed for Claude Code, Codex, Cursor, Gemini CLI, Copilot and more, judged by the models you actually run."
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.8"
-keywords = ["agent", "skills", "claude-code", "codex", "cursor", "llm"]
+requires-python = ">=3.9"
+keywords = ["agent-skills", "skills", "claude-code", "claude-skills", "codex", "cursor", "gemini-cli", "copilot", "skill-manager", "cleanup", "llm", "ai-agents"]
+
+[project.urls]
+Homepage = "https://github.com/x2724009/agent-skills-cleaner"
 
 [project.scripts]
-skillmolt = "skillmolt.__main__:main"
+agent-skills-cleaner = "agent_skills_cleaner.__main__:main"
+skills-cleaner = "agent_skills_cleaner.__main__:main"
 
 [tool.setuptools]
-packages = ["skillmolt"]
+packages = ["agent_skills_cleaner"]
 
 [tool.setuptools.package-data]
-skillmolt = ["web/*", "data/*.json"]
+agent_skills_cleaner = ["web/*", "data/*.json"]

@@ -3,9 +3,9 @@ import shutil
 import tempfile
 import unittest
 
-from skillmolt import actions, config
-from skillmolt.analyzer import analyze
-from skillmolt.scanner import parse_frontmatter, scan
+from agent_skills_cleaner import actions, config, models
+from agent_skills_cleaner.analyzer import analyze
+from agent_skills_cleaner.scanner import parse_frontmatter, scan
 
 PROMPT_ONLY = """---
 name: be-careful
@@ -144,17 +144,48 @@ class ConfigTest(unittest.TestCase):
         actions.STATE_DIR = self._saved
         shutil.rmtree(self.tmp)
 
-    def test_defaults_then_save(self):
-        self.assertEqual(config.load_config()["agents"]["Codex"]["model"], "GPT")
+    def test_empty_then_save(self):
+        self.assertEqual(config.load_config()["agents"], {})
         config.save_config({"agents": {"Codex": {"model": "GPT 6.1", "tier": "frontier"}, "DSH": {"model": "DeepSeek flash", "tier": "mid"}}})
         agents = config.load_config()["agents"]
         self.assertEqual(agents["Codex"]["model"], "GPT 6.1")
         self.assertEqual(agents["DSH"]["tier"], "mid")
-        self.assertEqual(agents["Claude Code"]["model"], "Claude")
 
     def test_rejects_unknown_tier(self):
         with self.assertRaises(ValueError):
             config.save_config({"agents": {"X": {"model": "m", "tier": "huge"}}})
+
+
+class ModelTest(unittest.TestCase):
+    def test_tier_from_model_name(self):
+        cases = {
+            "claude-opus-5-5": "frontier", "gpt-6.1-sol": "frontier", "Gemini": "frontier",
+            "workbuddy/deepseek-v4.1-flash": "mid", "claude-haiku-5-5": "mid", "gpt-6.1-mini": "mid",
+            "gpt-6.1-nano": "small", "qwen2.5-7b": "small", "llama3:8b": "small", "": "",
+        }
+        for model, tier in cases.items():
+            self.assertEqual(models.tier_for_model(model), tier, model)
+
+    def test_toml_reads_top_level_model_only(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            path = os.path.join(tmp, "config.toml")
+            with open(path, "w") as f:
+                f.write('model = "gpt-6.1-sol"\n[profiles.fast]\nmodel = "gpt-6.1-mini"\n')
+            self.assertEqual(models._toml_model(path), "gpt-6.1-sol")
+        finally:
+            shutil.rmtree(tmp)
+
+    def test_reader_lowers_effective_tier_and_override_wins(self):
+        detected = {
+            "agents": {"Codex": {"model": "gpt-6.1-sol", "tier": "frontier", "source": "x"}},
+            "readers": [{"name": "DSH", "model": "deepseek-v4.1-flash", "tier": "mid", "source": "y", "reads": ["Codex"]}],
+        }
+        p = models.effective_profile(detected, {}, ["Codex", "Claude Code"])
+        self.assertEqual(p["Codex"]["effective"], "mid")
+        self.assertEqual(p["Claude Code"]["effective"], "frontier")
+        p = models.effective_profile(detected, {"Claude Code": {"model": "qwen2.5-7b", "tier": ""}}, ["Claude Code"])
+        self.assertEqual((p["Claude Code"]["tier"], p["Claude Code"]["source"]), ("small", "manual"))
 
 
 class PackageTest(unittest.TestCase):

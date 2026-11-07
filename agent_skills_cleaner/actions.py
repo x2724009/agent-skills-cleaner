@@ -4,7 +4,7 @@
 - delete:    move the skill folder to the system Trash and remove every
              symlink that pointed at it.
 
-Every operation is written to ~/.skillmolt/history.json with enough
+Every operation is written to ~/.agent-skills-cleaner/history.json with enough
 detail to undo it, and nothing is ever removed permanently.
 """
 
@@ -15,9 +15,9 @@ import sys
 import time
 import uuid
 
-STATE_DIR = os.path.expanduser("~/.skillmolt")
+STATE_DIR = os.path.expanduser("~/.agent-skills-cleaner")
 HISTORY_PATH = os.path.join(STATE_DIR, "history.json")
-LEGACY_STATE_DIR = os.path.expanduser("~/.skill-sweep")  # name before the SkillMolt rename
+LEGACY_STATE_DIRS = [os.path.expanduser(p) for p in ("~/.skill-sweep", "~/.skillmolt")]  # earlier names of this tool
 
 
 class ActionError(Exception):
@@ -37,11 +37,21 @@ def trash_dir():
 
 
 def _migrate_legacy():
-    """Carry undo history over from the old ~/.skill-sweep folder once."""
-    if STATE_DIR != os.path.expanduser("~/.skillmolt"):
+    """Move undo history and settings over from older folder names, file by file."""
+    if STATE_DIR != os.path.expanduser("~/.agent-skills-cleaner"):
         return  # tests and custom setups manage their own state
-    if os.path.isdir(LEGACY_STATE_DIR) and not os.path.exists(STATE_DIR):
-        os.rename(LEGACY_STATE_DIR, STATE_DIR)
+    for old in LEGACY_STATE_DIRS:
+        if not os.path.isdir(old):
+            continue
+        for name in ("history.json", "config.json"):
+            src, dst = os.path.join(old, name), os.path.join(STATE_DIR, name)
+            if os.path.isfile(src) and not os.path.exists(dst):
+                os.makedirs(STATE_DIR, exist_ok=True)
+                os.replace(src, dst)
+        try:
+            os.rmdir(old)  # only succeeds once nothing else is left in it
+        except OSError:
+            pass
 
 
 def load_history():
@@ -103,11 +113,11 @@ def _delete_steps(skill):
     for install in skill["installs"]:
         if install["kind"] == "link" and os.path.islink(install["path"]):
             steps.append(_unlink(install["path"]))
-    dest = os.path.join(trash_dir(), "%s (skillmolt %s)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S")))
+    dest = os.path.join(trash_dir(), "%s (agent-skills-cleaner %s)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S")))
     n = 1
     while os.path.lexists(dest):
         n += 1
-        dest = os.path.join(trash_dir(), "%s (skillmolt %s-%d)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S"), n))
+        dest = os.path.join(trash_dir(), "%s (agent-skills-cleaner %s-%d)" % (os.path.basename(real), time.strftime("%Y%m%d-%H%M%S"), n))
     shutil.move(real, dest)
     steps.append({"op": "move", "src": real, "dst": dest})
     return steps

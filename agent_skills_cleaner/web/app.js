@@ -1,12 +1,12 @@
 (function () {
   "use strict";
 
-  const CFG = window.SKILLMOLT;
+  const CFG = window.AGENT_SKILLS_CLEANER;
   const $ = (sel) => document.querySelector(sel);
 
   const I18N = {
     zh: {
-      tagline: "管理电脑上所有 AI 工具的 skills，蜕掉模型已经用不上的旧壳",
+      tagline: "管理电脑上所有 AI 工具的 skills，按你实际用的模型找出没必要的那些",
       rescan: "重新扫描",
       history: "操作记录",
       readonlyBanner: "只读模式：可以查看分析结果，卸载和删除已禁用",
@@ -17,24 +17,32 @@
         "<li><b>强制指令多</b>（大量“必须/永远/每次”）、<b>要求先调用别的技能</b>、<b>规定冗长流程</b>、<b>说明过长</b>、<b>触发范围过宽</b>、<b>长期未更新</b>，各自加分。</li>" +
         "<li><b>带脚本或工具</b>、<b>教模型用具体的命令行接口</b>、<b>附带参考资料</b>会减分——这些是模型凭空做不到的。</li>" +
         "<li><b>已知过时清单</b>（社区维护的 known.json）优先于自动规则。</li>" +
-        "<li><b>按档位</b>：在“设置模型”里给工具标上档位后，“模型自己会的”那几项加分，中档模型只算 50%，小模型只算 20%；整体结论按能看到它的最弱模型来定。</li>" +
+        "<li><b>按档位</b>：自动从各工具的配置文件识别它用的模型和档位，“模型自己会的”那几项加分，中档模型只算 50%，小模型只算 20%；结论按能看到它的最弱模型来定。</li>" +
         "<li>≥60 建议删除，35–59 可以考虑，&lt;35 保留。分数只是参考，最终由你决定。</li>" +
         "</ul>" +
         "<p class='muted'>“卸载”只解除某个工具与技能的链接，原文件不动；“删除”把技能文件夹移到废纸篓并解除所有链接。两者都能在操作记录里一键撤销。</p>",
       search: "搜索名称或介绍…",
       allAgents: "全部工具",
       agentsLabel: "所在工具",
-      editModels: "设置模型",
+      editModels: "模型识别",
       modelsTitle: "每个工具用的是什么模型",
-      modelsHint: "这里填的模型会标在工具旁边。档位先记录下来，之后评分会按档位调整：同一个流程型技能，对前沿模型是累赘，对小模型可能还有用。",
-      modelPlaceholder: "例如 Claude Opus 5.5",
+      modelsHint: "模型和档位是从各工具的配置文件里自动识别的。识别不准时可以在这里改，留空就用自动识别的结果。",
+      modelPlaceholder: "没识别到，可手动填写",
       tierUnset: "档位未设置",
       tier_frontier: "前沿模型",
       tier_mid: "中档模型",
       tier_small: "小模型",
       save: "保存",
       saved: "模型设置已保存",
-      noModel: "未设置模型",
+      noModel: "未识别到模型",
+      srcManual: "手动设置",
+      srcDefault: "默认（该工具只用这家模型）",
+      srcFile: (f) => "读取自 " + f,
+      srcNone: "没找到配置",
+      tierAuto: (x) => "自动：" + x,
+      tierUnknown: "未识别",
+      alsoReads: (n, m, tier) => n + " 也会读取这个目录：" + m + "（" + tier + "）",
+      readerNote: (n, m, tier) => n + " 会读取所有工具的技能目录，它用的是 " + m + "（" + tier + "），所以这些目录都至少按" + tier + "评判。",
       judgedAs: (tier) => "按" + tier + "评判",
       judgedWhy: "删除会让所有工具都失去它，所以整体结论按能看到它的最弱模型来定；卸载时看每个工具自己的结论。",
       judgedForAgent: (a, tier) => "当前按 " + a + " 的" + tier + "显示",
@@ -108,14 +116,14 @@
       restored: "已撤销",
       restore: "撤销",
       noHistory: "还没有操作记录",
-      historyHint: "所有操作都会记在 ~/.skillmolt/history.json，删除的文件在废纸篓里，随时可以恢复。",
+      historyHint: "所有操作都会记在 ~/.agent-skills-cleaner/history.json，删除的文件在废纸篓里，随时可以恢复。",
       act_uninstall: "卸载",
       act_delete: "删除",
       "act_remove-broken": "移除失效链接",
       error: "出错了：",
     },
     en: {
-      tagline: "Manage every agent's skills and shed the ones your models have outgrown",
+      tagline: "Manage every agent's skills and find the ones your models have outgrown",
       rescan: "Rescan",
       history: "History",
       readonlyBanner: "Read-only mode: analysis only, uninstall and delete are disabled",
@@ -126,24 +134,32 @@
         "<li>Points are added for <b>lots of hard rules</b> (MUST/ALWAYS/every time), <b>chaining other skills</b>, <b>prescribed ceremony</b>, <b>very long instructions</b>, <b>broad triggers</b> and <b>staleness</b>.</li>" +
         "<li>Points are removed for <b>bundled scripts or tools</b>, <b>teaching a specific CLI</b> and <b>reference material</b> - things a model cannot do from scratch.</li>" +
         "<li>The community-maintained <b>known list</b> (known.json) wins over heuristics.</li>" +
-        "<li><b>By tier</b>: once you set each agent's tier under Set models, points for what strong models already do count 50% for mid-range and 20% for small models. The overall verdict follows the weakest model that can see the skill.</li>" +
+        "<li><b>By tier</b>: each agent's model is detected from its config file. Points for what strong models already do count 50% for mid-range and 20% for small models, and the verdict follows the weakest model that can see the skill.</li>" +
         "<li>≥60 remove, 35–59 consider, &lt;35 keep. The score is advice; you decide.</li>" +
         "</ul>" +
         "<p class='muted'>Uninstall removes one agent's link and leaves the files alone. Delete moves the skill folder to the Trash and removes every link. Both can be undone from History.</p>",
       search: "Search name or description…",
       allAgents: "All agents",
       agentsLabel: "Agent",
-      editModels: "Set models",
+      editModels: "Models",
       modelsTitle: "Which model each agent runs",
-      modelsHint: "The model you enter is shown next to each agent. The tier is saved for scoring: a process-style skill that slows a frontier model down may still help a small one.",
-      modelPlaceholder: "e.g. Claude Opus 5.5",
+      modelsHint: "Models and tiers are detected from each agent's config files. Correct them here if detection is wrong; leave a field empty to use the detected value.",
+      modelPlaceholder: "Not detected; type one",
       tierUnset: "Tier not set",
       tier_frontier: "Frontier",
       tier_mid: "Mid-range",
       tier_small: "Small",
       save: "Save",
       saved: "Models saved",
-      noModel: "No model set",
+      noModel: "No model found",
+      srcManual: "set by you",
+      srcDefault: "default (this agent only runs one vendor)",
+      srcFile: (f) => "from " + f,
+      srcNone: "no config found",
+      tierAuto: (x) => "Auto: " + x,
+      tierUnknown: "unknown",
+      alsoReads: (n, m, tier) => n + " also reads this folder: " + m + " (" + tier + ")",
+      readerNote: (n, m, tier) => n + " reads every agent's skills folder with " + m + " (" + tier + "), so each folder is judged at " + tier + " or below.",
       judgedAs: (tier) => "Judged for a " + tier + " model",
       judgedWhy: "Deleting removes it from every agent, so the overall verdict follows the weakest model that can see it. For uninstalling, check each agent's own verdict.",
       judgedForAgent: (a, tier) => "Showing " + a + "'s " + tier + " verdict",
@@ -217,7 +233,7 @@
       restored: "Undone",
       restore: "Undo",
       noHistory: "Nothing yet",
-      historyHint: "Every action is logged in ~/.skillmolt/history.json and deleted files sit in the Trash, so everything can be restored.",
+      historyHint: "Every action is logged in ~/.agent-skills-cleaner/history.json and deleted files sit in the Trash, so everything can be restored.",
       act_uninstall: "Uninstall",
       act_delete: "Delete",
       "act_remove-broken": "Remove broken link",
@@ -226,15 +242,22 @@
   };
 
   let lang = "zh";
-  try { lang = localStorage.getItem("skillmolt-lang") || (navigator.language.startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage blocked */ }
+  try { lang = localStorage.getItem("agent-skills-cleaner-lang") || (navigator.language.startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage blocked */ }
   const t = (k, ...a) => { const v = I18N[lang][k]; return typeof v === "function" ? v(...a) : v; };
 
   let report = null;
   let agentFilter = "";
   let modelCfg = { agents: {} };
-  const modelOf = (a) => (modelCfg.agents[a] || {}).model || "";
-  const tierOf = (a) => (modelCfg.agents[a] || {}).tier || "";
-  const agentTitle = (a) => a + " · " + (modelOf(a) || t("noModel")) + (tierOf(a) ? " · " + t("tier_" + tierOf(a)) : "");
+  const prof = (a) => (report && report.profile && report.profile[a]) || { model: "", tier: "", readers: [], effective: "frontier" };
+  const modelOf = (a) => prof(a).model || "";
+  const tierOf = (a) => prof(a).tier || "";
+  const srcLabel = (src) => src === "manual" ? t("srcManual") : src === "default" ? t("srcDefault") : src ? t("srcFile", src) : t("srcNone");
+  function agentTitle(a) {
+    const p = prof(a);
+    let line = a + " · " + (p.model || t("noModel")) + (p.tier ? "（" + t("tier_" + p.tier) + "）" : "") + " · " + srcLabel(p.source);
+    p.readers.forEach((r) => { line += "\n" + t("alsoReads", r.name, r.model || "?", r.tier ? t("tier_" + r.tier) : "?"); });
+    return line + "\n" + t("judgedAs", t("tier_" + p.effective));
+  }
   let filter = "all";
   const selected = new Set();
 
@@ -319,7 +342,7 @@
   const open = new Set();
   const openPkgs = new Set();
   let view = "verdict";
-  try { view = localStorage.getItem("skillmolt-view") || "verdict"; } catch (e) { /* storage blocked */ }
+  try { view = localStorage.getItem("agent-skills-cleaner-view") || "verdict"; } catch (e) { /* storage blocked */ }
   const pkgById = (id) => (report.packages || []).find((p) => p.id === id);
 
   function renderSummary() {
@@ -365,7 +388,7 @@
         const at = s.agent_tiers[i.agent];
         const av = s.tiers[at];
         return "<div class='inst' title='" + esc(home(i.path)) + "'><span class='agent'>" + esc(i.agent) + "</span>" +
-          "<span class='kind'>" + esc((modelOf(i.agent) || tierName(at)) + " · " + (isLink ? t("link") : t("folder"))) + "</span>" +
+          "<span class='kind'>" + esc((modelOf(i.agent) || "—") + (prof(i.agent).readers.length ? " + " + prof(i.agent).readers.map((r) => r.name + " " + (r.model || "")).join(", ") : "") + " · " + (isLink ? t("link") : t("folder"))) + "</span>" +
           "<span class='pill " + av.verdict + "' title='" + esc(tierName(at)) + "'>" + av.score + " " + esc(t(av.verdict)) + "</span>" + btn + "</div>";
       }).join("");
       detail =
@@ -490,6 +513,7 @@
     $("#agents").innerHTML = "<span class='agents-label'>" + esc(t("agentsLabel")) + "</span>" + items.map(([v, label, n]) =>
       "<button data-agent-filter='" + esc(v) + "' aria-pressed='" + (agentFilter === v) + "'" + (v ? " title='" + esc(agentTitle(v)) + "'" : "") + ">" + esc(label) +
       (v && modelOf(v) ? "<span class='model'>" + esc(modelOf(v)) + "</span>" : "") +
+      (v && prof(v).readers.length ? "<span class='reader'>+" + esc(prof(v).readers.map((r) => r.name).join("+")) + "</span>" : "") +
       "<span class='n'>" + n + "</span></button>").join("") +
       "<button class='ghost small edit-models' data-edit-models>" + esc(t("editModels")) + "</button>";
   }
@@ -607,18 +631,29 @@
 
   function openModels() {
     const dlg = $("#models");
-    $("#models-body").innerHTML = agents().map((a, i) =>
-      "<label class='model-row' for='model-" + i + "'><span class='agent'>" + esc(a) + "</span>" +
-      "<input id='model-" + i + "' data-model-agent='" + esc(a) + "' value='" + esc(modelOf(a)) + "' placeholder='" + esc(t("modelPlaceholder")) + "' maxlength='80'>" +
-      "<select id='tier-" + i + "' aria-label='" + esc(a) + "'>" +
-      ["", "frontier", "mid", "small"].map((v) => "<option value='" + v + "'" + (tierOf(a) === v ? " selected" : "") + ">" + esc(v ? t("tier_" + v) : t("tierUnset")) + "</option>").join("") +
-      "</select></label>").join("");
+    const saved = modelCfg.agents || {};
+    const readers = [];
+    agents().forEach((a) => prof(a).readers.forEach((r) => { if (!readers.some((x) => x.name === r.name)) readers.push(r); }));
+    $("#models-body").innerHTML = agents().map((a, i) => {
+      const p = prof(a);
+      const o = saved[a] || {};
+      const autoTier = p.tier && p.source !== "manual" ? t("tier_" + p.tier) : t("tierUnknown");
+      return "<div class='model-row'><label class='agent' for='model-" + i + "'>" + esc(a) +
+        "<span class='src'>" + esc(srcLabel(p.source === "manual" ? null : p.source)) + "</span></label>" +
+        "<input id='model-" + i + "' data-model-agent='" + esc(a) + "' value='" + esc(o.model || "") + "' placeholder='" + esc(p.source !== "manual" && p.model ? p.model : t("modelPlaceholder")) + "' maxlength='80'>" +
+        "<select id='tier-" + i + "' aria-label='" + esc(a) + "'>" +
+        ["", "frontier", "mid", "small"].map((v) => "<option value='" + v + "'" + ((o.tier || "") === v ? " selected" : "") + ">" + esc(v ? t("tier_" + v) : t("tierAuto", autoTier)) + "</option>").join("") +
+        "</select></div>";
+    }).join("") + readers.map((r) =>
+      "<p class='muted reader-note'>" + esc(t("readerNote", r.name, r.model || "?", r.tier ? t("tier_" + r.tier) : "?")) + "</p>").join("");
     dlg.returnValue = "";
     dlg.onclose = async () => {
       if (dlg.returnValue !== "ok") return;
-      const agentsCfg = Object.assign({}, modelCfg.agents);
+      const agentsCfg = {};
       dlg.querySelectorAll("[data-model-agent]").forEach((input, i) => {
-        agentsCfg[input.dataset.modelAgent] = { model: input.value.trim(), tier: $("#tier-" + i).value };
+        const model = input.value.trim();
+        const tier = $("#tier-" + i).value;
+        if (model || tier) agentsCfg[input.dataset.modelAgent] = { model, tier };
       });
       try {
         modelCfg = await api("/api/config", { agents: agentsCfg });
@@ -704,7 +739,7 @@
     else if (d.pkgUninstall) doUninstallPackage(d.pkgUninstall, d.agent);
     else if (d.view) {
       view = d.view;
-      try { localStorage.setItem("skillmolt-view", view); } catch (e) { /* storage blocked */ }
+      try { localStorage.setItem("agent-skills-cleaner-view", view); } catch (e) { /* storage blocked */ }
       renderList();
     }
   });
@@ -721,7 +756,7 @@
   $("#btn-bulk").addEventListener("click", () => doDelete([...selected]));
   $("#btn-lang").addEventListener("click", () => {
     lang = lang === "zh" ? "en" : "zh";
-    try { localStorage.setItem("skillmolt-lang", lang); } catch (e) { /* storage blocked */ }
+    try { localStorage.setItem("agent-skills-cleaner-lang", lang); } catch (e) { /* storage blocked */ }
     render();
     if (!$("#drawer").hidden) loadHistory();
   });
